@@ -52,6 +52,12 @@ function App() {
 
         {sim.error && <p className="mb-4 text-sm text-red-400">Failed to load alerts: {sim.error}</p>}
 
+        {sim.offline && role !== 'how' && (
+          <p className="mb-4 rounded border border-sky-700 bg-sky-900/40 p-2 text-xs text-sky-200">
+            Offline — showing the last alerts this device received.
+          </p>
+        )}
+
         {sim.bundle?.source === 'captured' && role !== 'how' && (
           <p className="mb-4 rounded border border-amber-700 bg-amber-900/40 p-2 text-xs text-amber-200">
             Demo data, not a live hub. {sim.bundle.captureNote}
