@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AlertBundle, AlertBundleEntry } from '@ligtas/core'
+import { cacheBundle, loadCachedBundle } from './alertCache'
 import { evaluateBundle, type EvaluatedAlert } from './evaluateBundle'
 import {
   TESTER_ISSUER_INDEX,
@@ -31,6 +32,8 @@ export interface Simulation {
   evaluated: EvaluatedAlert[] | null
   /** How many leading entries came from the real captured mesh-sim run. */
   capturedCount: number
+  /** True when the network fetch failed and this is the last idb-cached bundle instead. */
+  offline: boolean
   testerPublicKey: string
   broadcast: (kind: Exclude<BroadcastKind, 'replay-exact'>, options: BroadcastOptions) => void
   replayExact: (index: number) => void
@@ -49,6 +52,7 @@ export function useSimulation(): Simulation {
   const [captured, setCaptured] = useState<AlertBundle | null>(null)
   const [broadcasts, setBroadcasts] = useState<AlertBundleEntry[]>(loadStoredBroadcasts)
   const [error, setError] = useState<string | null>(null)
+  const [offline, setOffline] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -57,8 +61,26 @@ export function useSimulation(): Simulation {
         if (!r.ok) throw new Error(`fetch failed: ${r.status}`)
         return r.json() as Promise<AlertBundle>
       })
-      .then((b) => !cancelled && setCaptured(b))
-      .catch((e) => !cancelled && setError(String(e)))
+      .then((b) => {
+        if (cancelled) return
+        setCaptured(b)
+        setOffline(false)
+        void cacheBundle(b)
+      })
+      .catch((fetchError: unknown) => {
+        // No network (or no hub reachable): fall back to the last bundle
+        // this device actually received, rather than an empty screen.
+        void loadCachedBundle().then((cached) => {
+          if (cancelled) return
+          if (cached !== null) {
+            setCaptured(cached)
+            setOffline(true)
+            setError(null)
+          } else {
+            setError(String(fetchError))
+          }
+        })
+      })
     return () => {
       cancelled = true
     }
@@ -114,6 +136,7 @@ export function useSimulation(): Simulation {
     bundle,
     evaluated,
     capturedCount: captured?.alerts.length ?? 0,
+    offline,
     testerPublicKey: issuer.publicKey(),
     broadcast,
     replayExact,

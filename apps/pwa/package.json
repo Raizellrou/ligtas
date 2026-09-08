@@ -13,6 +13,7 @@
     "@ligtas/core": "workspace:*",
     "@stellar/stellar-sdk": "^17.0.1",
     "@tailwindcss/vite": "^4.3.3",
+    "idb": "^8.0.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.3"
@@ -24,6 +25,8 @@
     "@vitejs/plugin-react": "^6.1.0",
     "oxlint": "^1.79.0",
     "typescript": "~6.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "vite-plugin-pwa": "^1.3.0",
+    "workbox-window": "^7.4.1"
   }
 }
