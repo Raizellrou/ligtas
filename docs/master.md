@@ -14,7 +14,7 @@ Longer-form reference doc. Not auto-loaded — see [CLAUDE.md](../CLAUDE.md) for
 
 **4. Reconnection layer.** When the hub regains internet connectivity, the outbox drains: each queued alert hash gets anchored to Stellar (`MEMO_HASH`, Testnet for now), and matching claimable balances are created for households in the affected puroks.
 
-**5. Registry (off-chain, pre-disaster).** Household ID → purok → Stellar address. TODO: confirm whether this lives in the hub's SQLite DB or a separate store, and how it syncs across hubs if a barangay needs more than one (see "WiFi range" limitation in README).
+**5. Registry (off-chain, pre-disaster).** Household ID → purok → Stellar address. Built: lives in the hub's SQLite DB (`packages/hub/src/households.ts`, seeded from `config/households.json` on startup, same pattern as the issuer list). Still open: how it syncs across hubs if a barangay needs more than one (see "WiFi range" limitation in README, and PRD §12 open question #5) — each hub currently has its own independent copy, with no reconciliation between them.
 
 ---
 
