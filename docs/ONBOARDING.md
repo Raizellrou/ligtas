@@ -426,12 +426,12 @@ appears on Stellar Expert and matches the locally recomputed hash.*
 |---|---|---|---|
 | 4.1 | `packages/stellar` anchoring | Done | — |
 | 4.2 | Hub drain worker | Done | — |
-| 4.3 | **PWA offline hardening** | **Not started — this is the open Stage 4 item** | Add `vite-plugin-pwa` (service worker) and `idb` (persist cached alerts). BUILD-PLAN is explicit: verify with a **real device in airplane mode**, not devtools throttling. |
-| 4.4 | Proof capture | Partial | The Stellar-side proof exists in `packages/stellar/README.md`. Still want Stellar Expert screenshots collected somewhere presentable, with the on-chain hash checked against the locally recomputed one. |
+| 4.3 | PWA offline hardening | Done | `vite-plugin-pwa` (service worker) + `idb` (persist cached alerts). Verified by killing the serving process entirely after a normal load and reloading — app shell and the last-known alert bundle both still rendered, served from the service worker cache. Not verified on a real device in actual airplane mode. |
+| 4.4 | Proof capture | Done | Screenshot and a from-scratch re-verification (on-chain memo decoded and checked against the locally recomputed hash, redone rather than trusted) in `docs/proof/`. |
 
-**4.3 is the natural first feature for you.** It is self-contained, it is frontend, nothing
-else blocks on it, and it is the one thing standing between the repo and Stage 4's exit
-criterion.
+Stage 4's exit criterion is met: a service worker keeps the correct purok instruction available
+with the origin unreachable, and an alert hash is visible on Stellar Expert matching the locally
+recomputed hash. See `docs/proof/` and item 4.3's PR for how each was verified.
 
 ### Stage 5 · Launch (MVP)
 

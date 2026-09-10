@@ -45,18 +45,19 @@ Result — a real, confirmed Testnet transaction:
   memo (base64 → hex) = `fd36f3cf2486a9ca4fd090efa752429aea46caaa95d199e8901fafe1d479121b`
   — **matches the locally recomputed hash exactly**. This is PRD Goal G5 ("alert
   hash visible on Stellar Expert, matches locally recomputed hash"), demonstrated
-  end to end, not just asserted.
+  end to end, not just asserted. Screenshot and a from-scratch re-verification of
+  this same match: `docs/proof/`.
 
-## Not yet built (Stage 4/5, in order per docs/BUILD-PLAN.md)
+## Built since this README was first written
 
-- **Hub drain worker** — nothing yet calls `anchorAlertHash` automatically for
-  `packages/hub`'s `pending` outbox rows. This package is the primitive; wiring
-  it into the hub's reconnection loop (PRD Section 6.2: submit → record tx hash
-  before awaiting confirmation → mark confirmed, idempotent and re-entrant) is
-  the next piece.
-**Claimable balances / payout** are built (`payout.ts`) and verified live against
-real Testnet — three real claimable balances created for real (unfunded) demo
-household addresses, predicates fetched back from Horizon and checked, and an
-interrupted-run reconciliation proven the same way the anchor one was. Full
-writeup: `packages/hub/README.md`'s "Verified live, not just unit tested"
-section, since the proof runs through the hub's drain worker end to end.
+- **Hub drain worker** — `packages/hub/src/drain.ts` now calls `anchorAlertHash`
+  automatically for `pending` outbox rows, following PRD Section 6.2's sequence
+  (submit → record tx hash before awaiting confirmation → mark confirmed).
+  Idempotent and re-entrant — verified live including a simulated mid-drain
+  crash, which reconciled without double-anchoring.
+- **Claimable balances / payout** — built (`payout.ts`) and verified live against
+  real Testnet: three real claimable balances created for real (unfunded) demo
+  household addresses, predicates fetched back from Horizon and checked, and an
+  interrupted-run reconciliation proven the same way the anchor one was. Full
+  writeup: `packages/hub/README.md`'s "Verified live, not just unit tested"
+  section, since the proof runs through the hub's drain worker end to end.
