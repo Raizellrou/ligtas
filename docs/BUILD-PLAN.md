@@ -96,7 +96,7 @@ Closing date not yet published.
 3. **Idempotency hardening** — PRD §7 names this the highest-risk correctness surface in the system. Dedicated tests: run the drain, interrupt it, re-run it, assert no double payment.
 4. **Demo recording** — the README's full definition of done, start to finish, uncut.
 
-Demo household accounts must be Friendbot-funded before this stage. Each claimable balance raises the sponsoring account's reserve requirement; Friendbot's 10,000 XLM covers a demo comfortably, but the accounts need to exist first.
+The hub's own paying account must be Friendbot-funded before this stage — each claimable balance it creates raises *its own* reserve requirement, and Friendbot's 10,000 XLM covers a demo comfortably. Household/claimant accounts do **not** need to exist or be funded beforehand: verified live, three claimable balances created for three fresh, never-funded demo addresses (`packages/hub/README.md`). This corrects an earlier version of this note, which wrongly implied the household side needed funding first.
 
 ---
 
@@ -112,6 +112,14 @@ Demo household accounts must be Friendbot-funded before this stage. Each claimab
 
 Native XLM rather than a peso-pegged test asset: no issuer account, no trustline setup per household, and Friendbot funding works immediately. The real-world peso figure is a policy decision a barangay sets against its own DRRM fund allocation — it is deliberately not hardcoded into the demo, and saying so is more honest than inventing a number and presenting it as designed.
 
+**Reclaim window — closes PRD §12 open question #7.** 30 days. An unclaimed
+claimable balance becomes reclaimable by the hub's own account 30 days after
+it was created (`Claimant.predicateNot(predicateBeforeRelativeTime(2592000))`),
+so a payout nobody ever claims eventually returns to the pool rather than
+sitting outstanding forever. Verified live against real Testnet: the
+predicate fetched back from Horizon reads `rel_before: "2592000"` exactly
+(`packages/hub/README.md`).
+
 **Wokwi sensor node** — kept in Stage 3 scope, designated first cut.
 
 ---
@@ -119,6 +127,6 @@ Native XLM rather than a peso-pegged test asset: no issuer account, no trustline
 ## 7. Risks
 
 - **Stage 3 carries the most unplanned work.** Both the hub and the PWA start from zero, in the same 17 days. Stages 4 and 5 build on foundations that will exist by then. Front-load effort accordingly and treat the 15–19 September window as real buffer, not spare capacity.
-- **Two PRD open questions still block Stage 5**, though not Stage 4: reclaim window (§12 #7) and — now resolved above — payout denomination (§12 #8).
+- **Both PRD open questions that blocked Stage 5 are now resolved** (§6 above): reclaim window (§12 #7) and payout denomination (§12 #8).
 - **Stage 4 and 5 dates are unpublished.** The sequencing above holds regardless, but the calendar cannot be committed to until they are.
 - **The hosted build proves the packet format, the signature scheme, and the rejection rules. It does not prove live radio propagation.** That distinction is stated in PRD §11 and should stay in any demo narration — claiming otherwise is the kind of overclaim the PRD was written to avoid.

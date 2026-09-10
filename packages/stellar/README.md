@@ -16,6 +16,13 @@ Stellar Classic only. No Soroban, no Rust (CLAUDE.md hard constraint).
   `account` to itself, memo `MEMO_HASH = alertHash`. `alertHash` is meant to be
   `packages/core`'s own `alertHash()` output fed straight in, 32 bytes, no
   re-encoding — the memo field takes it exactly, no loss (PRD Section 7).
+- `preparePayoutTransaction(account, severity, claims)` — one
+  `createClaimableBalance` operation per claim, flat amount by severity tier
+  (`PAYOUT_TIER_AMOUNT_XLM`: 10/25/50 XLM), unconditionally claimable by the
+  household and reclaimable by `account` after `RECLAIM_WINDOW_SECONDS` (30
+  days — PRD open question #7, resolved). Same two-phase
+  prepare-then-`submit()` shape as `prepareAnchorTransaction`, for the same
+  durability reason.
 
 ## Verified against real Testnet, not mocked
 
@@ -48,9 +55,9 @@ Result — a real, confirmed Testnet transaction:
   (submit → record tx hash before awaiting confirmation → mark confirmed).
   Idempotent and re-entrant — verified live including a simulated mid-drain
   crash, which reconciled without double-anchoring.
-
-## Not yet built (Stage 5)
-
-- **Claimable balances / payout** — `Operation.createClaimableBalance`, one per
-  matched household, flat amount by severity tier (denomination decided in
-  `docs/BUILD-PLAN.md` Section 6). Not built here yet.
+- **Claimable balances / payout** — built (`payout.ts`) and verified live against
+  real Testnet: three real claimable balances created for real (unfunded) demo
+  household addresses, predicates fetched back from Horizon and checked, and an
+  interrupted-run reconciliation proven the same way the anchor one was. Full
+  writeup: `packages/hub/README.md`'s "Verified live, not just unit tested"
+  section, since the proof runs through the hub's drain worker end to end.

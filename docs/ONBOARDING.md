@@ -437,23 +437,24 @@ recomputed hash. See `docs/proof/` and item 4.3's PR for how each was verified.
 
 | # | Work | State | Notes |
 |---|---|---|---|
-| 5.1 | **Payout flow** | Not started | One `createClaimableBalance` per matched household. Flat by severity tier — **tier 1 = 10 XLM, tier 2 = 25 XLM, tier 3 = 50 XLM**, native XLM on Testnet (decided in BUILD-PLAN §6). The alerts table already has an unused `payout_status` column defaulting to `'none'`. |
-| 5.2 | **Registry wiring** | Not started | A households table (household ID → purok → Stellar address), populated ahead of time; filter the alert's purok bitmap down to matching addresses. `docs/master.md` flags an open TODO on whether this lives in the hub's SQLite or a separate store. |
-| 5.3 | **Idempotency hardening** | Not started | PRD §7 calls this *the highest-risk correctness surface in the system.* Dedicated tests: run the drain, interrupt it, re-run it, assert no double payment. Do not treat this as optional. |
+| 5.1 | **Payout flow** | Done | One `createClaimableBalance` per matched household. Flat by severity tier — **tier 1 = 10 XLM, tier 2 = 25 XLM, tier 3 = 50 XLM**, native XLM on Testnet (decided in BUILD-PLAN §6). `payout_status`/`payout_tx` drive the same two-phase durability pattern anchoring already used. Verified live end to end — see `packages/hub/README.md`. |
+| 5.2 | **Registry wiring** | Done | `households` table (household ID → purok → Stellar address) lives in the hub's SQLite DB, seeded from `config/households.json` on startup. `docs/master.md`'s TODO on where it lives is resolved; syncing it across multiple hubs is still genuinely open (PRD §12 #5). |
+| 5.3 | **Idempotency hardening** | Not started | PRD §7 calls this *the highest-risk correctness surface in the system.* Dedicated tests: run the drain, interrupt it, re-run it, assert no double payment. 5.1 is idempotent by construction and that was proven manually (`packages/hub/README.md`) — 5.3 is about proving it with automated tests and covering harder edge cases (Horizon-query fallback when `payout_status` itself is ambiguous). Do not treat this as optional. |
 | 5.4 | Demo recording | Not started | The README's full definition of done, start to finish, uncut. |
 
-Prerequisite: demo household accounts must be **Friendbot-funded before this stage** — each
-claimable balance raises the sponsoring account's reserve requirement, and the accounts have
-to exist first.
+Prerequisite: **the hub's own paying account** must be Friendbot-funded before this stage —
+each claimable balance it creates raises *its own* reserve requirement. Household/claimant
+accounts do **not** need to exist or be funded first — verified live, three claimable
+balances created for three fresh, never-funded demo addresses. (An earlier version of this
+note wrongly implied the household side needed funding too.)
 
 ### Blocking open questions
 
-`LIGTAS-PRD.md` §12 carries eight open questions. Two matter for your runway:
+`LIGTAS-PRD.md` §12 carries eight open questions. Two mattered for Stage 5's runway, and both are now resolved:
 
-- **#7 Reclaim window** — how long an unclaimed claimable balance stays outstanding before
-  the barangay account can reclaim it. **Blocks Stage 5 (5.1).** Needs a decision from both
-  of you, then recorded in `BUILD-PLAN.md` §6 the same way payout denomination was.
-- **#8 Payout denomination** — already resolved (native XLM, 10/25/50). No action.
+- **#7 Reclaim window** — 30 days. Verified live: the claimable balance predicate fetched back
+  from Horizon reads `rel_before: "2592000"` exactly. Recorded in `BUILD-PLAN.md` §6.
+- **#8 Payout denomination** — native XLM, 10/25/50. Recorded in `BUILD-PLAN.md` §6.
 
 The other six (duty cycle, sensor trust, key lifecycle, threshold ownership, pool
 replenishment, registry synchronisation, deployment partner) are documented-not-blocking.

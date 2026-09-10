@@ -43,8 +43,8 @@ export function createServer(alerts: AlertService, drain?: DrainConfig): Express
       res.status(503).json({ error: "drain not configured -- set LIGTAS_HUB_STELLAR_SECRET" });
       return;
     }
-    const results = await drainOutbox(drain.db, drain.issuer);
-    res.json({ results });
+    const summary = await drainOutbox(drain.db, drain.issuer);
+    res.json(summary);
   });
 
   return app;

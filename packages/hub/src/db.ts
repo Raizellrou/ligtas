@@ -20,8 +20,18 @@ CREATE TABLE IF NOT EXISTS alerts (
   anchor_status  TEXT NOT NULL DEFAULT 'pending',
   anchor_tx      TEXT,
   payout_status  TEXT NOT NULL DEFAULT 'none',
+  payout_tx      TEXT,
   attempts       INTEGER NOT NULL DEFAULT 0,
   last_error     TEXT
+);
+
+-- Registry (PRD Section 4, layer L5): household -> purok -> Stellar address,
+-- populated ahead of any disaster. Off-chain and local to this hub, per the
+-- PRD; not something field nodes or the PWA ever see.
+CREATE TABLE IF NOT EXISTS households (
+  household_id    TEXT PRIMARY KEY,
+  purok           INTEGER NOT NULL,
+  stellar_address TEXT NOT NULL
 );
 `;
 
