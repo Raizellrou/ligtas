@@ -320,6 +320,37 @@ cd packages/mesh-sim && <path-to-meshtasticator>/.venv/Scripts/python.exe run_re
 `apps/pwa/public/alert-bundle.json` — note that a run overwrites the committed demo bundle
 the PWA ships with, so check `git diff` afterwards).
 
+#### Click-driven alternative: the Tester tab's "Live mesh demo" panel
+
+Once the setup above is done once, you don't have to keep coming back to a terminal for it.
+With the hub running and the flags below set, `apps/pwa`'s Tester tab grows a "Live mesh
+demo" section with two buttons — **Run bridge_to_hub.py** and **Run run_relay_test.py** —
+that spawn the real scripts above as a hub-managed child process, stream their log output
+into the browser, and render the parsed result (the real accepted/forged/replayed alerts for
+the bridge script, the PASS/FAIL checklist for the relay-proof script).
+
+Extra hub env vars this needs, on top of everything else in §4.2:
+
+| Env var | Default | Purpose |
+|---|---|---|
+| `LIGTAS_ENABLE_MESH_ORCHESTRATION` | *(unset)* | Must be `1` or `true` — the `/demo/mesh-test/*` routes don't exist at all otherwise. Off by default deliberately: this route spawns local processes, more sensitive than anything else the hub does with no auth. Never turn this on for a publicly reachable hub. |
+| `MESHTASTICATOR_PATH` | same sibling-directory default as `driver.py` | Only needed if your Meshtasticator checkout isn't the default sibling location. |
+| `LIGTAS_PWA_ORIGIN` | `http://localhost:5173` | CORS allowlist for the `/demo/*` routes only — the PWA's dev server needs cross-origin access to poll them. |
+
+The panel checks `GET /demo/mesh-test/capabilities` on load and shows exactly what's missing
+(flag unset, Meshtasticator not found, venv Python not found, no demo issuer secret) rather
+than a silently-broken button — same "name the gap" convention as the rest of this repo. If
+the hub isn't reachable at all (the hosted/Vercel build, or a plain `pnpm dev` with no hub
+running), the panel renders nothing.
+
+```powershell
+$env:LIGTAS_ENABLE_MESH_ORCHESTRATION="1"; $env:LIGTAS_DEMO_ISSUER_SECRET="S..."; $env:PORT="3001"; node packages/hub/dist/index.js
+```
+
+Docker not running is deliberately **not** pre-checked — the job fails at the same point the
+manual command would, and the real Python traceback streams into the panel's log view rather
+than a guessed diagnosis.
+
 ### 4.4 `packages/stellar` — Horizon Testnet anchoring
 
 Full docs: [`../packages/stellar/README.md`](../packages/stellar/README.md).

@@ -5,7 +5,7 @@ import { openDb } from "./db.js";
 import { loadIssuers } from "./issuers.js";
 import { loadHouseholds, seedHouseholds } from "./households.js";
 import { AlertService } from "./alertService.js";
-import { createServer, type DrainConfig } from "./server.js";
+import { createServer, type DemoConfig, type DrainConfig } from "./server.js";
 import { drainOutbox } from "./drain.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -20,6 +20,17 @@ const HOUSEHOLDS_PATH = process.env.LIGTAS_HOUSEHOLDS_PATH ?? join(HERE, "..", "
 // only matters once connectivity returns anyway (PRD Section 6.2).
 const HUB_STELLAR_SECRET = process.env.LIGTAS_HUB_STELLAR_SECRET;
 const DRAIN_INTERVAL_MS = Number(process.env.LIGTAS_DRAIN_INTERVAL_MS ?? 60_000);
+
+// Dev-only: lets the PWA's Tester tab click-run the real mesh-sim scripts
+// instead of a terminal (see meshTestRunner.ts / demoRoutes.ts). Off unless
+// explicitly opted into -- this route spawns local processes, which is more
+// sensitive than anything else the hub already does with no auth at all.
+const ENABLE_MESH_ORCHESTRATION =
+  process.env.LIGTAS_ENABLE_MESH_ORCHESTRATION === "1" || process.env.LIGTAS_ENABLE_MESH_ORCHESTRATION === "true";
+const MESHTASTICATOR_PATH = process.env.MESHTASTICATOR_PATH;
+const PWA_ORIGIN = process.env.LIGTAS_PWA_ORIGIN ?? "http://localhost:5173";
+const DEMO_ISSUER_SECRET = process.env.LIGTAS_DEMO_ISSUER_SECRET;
+const DEMO_ISSUER_INDEX = process.env.LIGTAS_DEMO_ISSUER_INDEX;
 
 const db = openDb(DB_PATH);
 const issuers = loadIssuers(ISSUERS_PATH);
@@ -40,11 +51,25 @@ if (HUB_STELLAR_SECRET) {
   }, DRAIN_INTERVAL_MS);
 }
 
-const app = createServer(alerts, drainConfig);
+const demoConfig: DemoConfig | undefined = ENABLE_MESH_ORCHESTRATION
+  ? {
+      meshTest: {
+        port: PORT,
+        enabled: true,
+        meshtasticatorPath: MESHTASTICATOR_PATH,
+        demoIssuerSecret: DEMO_ISSUER_SECRET,
+        demoIssuerIndex: DEMO_ISSUER_INDEX,
+      },
+      pwaOrigin: PWA_ORIGIN,
+    }
+  : undefined;
+
+const app = createServer(alerts, drainConfig, demoConfig);
 
 app.listen(PORT, () => {
   console.log(
     `hub listening on :${PORT} (db: ${DB_PATH}, ${issuers.size} issuer(s) loaded, ${households.length} household(s) loaded, ` +
-      `drain: ${drainConfig ? `every ${DRAIN_INTERVAL_MS}ms` : "disabled -- no LIGTAS_HUB_STELLAR_SECRET"})`,
+      `drain: ${drainConfig ? `every ${DRAIN_INTERVAL_MS}ms` : "disabled -- no LIGTAS_HUB_STELLAR_SECRET"}, ` +
+      `mesh-test: ${demoConfig ? `enabled, PWA origin ${PWA_ORIGIN}` : "disabled -- no LIGTAS_ENABLE_MESH_ORCHESTRATION"})`,
   );
 });

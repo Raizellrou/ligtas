@@ -19,8 +19,19 @@ Three tabs, persisted in `localStorage` (`ligtas.role`):
   view uses, for demoing the reject cases (forged signature, replayed sequence) without a
   live mesh. Uses a reserved issuer index (255, `apps/pwa/src/lib/simulation.ts`) so it can
   never collide with a real committed demo issuer — see "Two real bugs" in
-  `docs/ONBOARDING.md` §6 for why that boundary matters.
+  `docs/ONBOARDING.md` §6 for why that boundary matters. Also has a "Live mesh demo" panel
+  (`src/views/LiveMeshPanel.tsx`) that click-drives the real `packages/mesh-sim` scripts
+  through a local hub — see "Talking to a local hub" below.
 - **How it works** — static explainer, no live state.
+
+## Talking to a local hub
+
+`VITE_LIGTAS_HUB_URL` (default `http://localhost:3001`) points the Tester tab's "Live mesh
+demo" panel at a hub's `/demo/mesh-test/*` routes (`docs/ONBOARDING.md` §4.3,
+`packages/hub/README.md`). Those routes only exist on a hub explicitly started with
+`LIGTAS_ENABLE_MESH_ORCHESTRATION=1` — on the hosted/Vercel build, or a plain `pnpm dev` with
+no hub running, the panel's capabilities check fails to connect and it renders nothing rather
+than a broken button.
 
 ## Where the data comes from
 

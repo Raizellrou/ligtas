@@ -38,6 +38,28 @@ Env vars: `PORT` (default 3001), `LIGTAS_DB_PATH` (default `packages/hub/hub.sql
 - `POST /drain` — manually triggers an outbox drain: anchors every `pending` alert to Stellar Testnet (reconciling anything stuck `submitted` from an interrupted run first), then, for each now-`confirmed` alert with `payout_status = 'none'`, creates one claimable balance per matched household (PRD Section 7) — flat by severity tier (`@ligtas/stellar`'s `PAYOUT_TIER_AMOUNT_XLM`), reconciling anything stuck `pending` from an interrupted run first, the same way anchoring does. Returns `{ anchors: [{ alertHash, outcome }], payouts: [{ alertHash, outcome, matchedHouseholds? }] }`. 503 if `LIGTAS_HUB_STELLAR_SECRET` isn't set.
 - `GET /health` — liveness check.
 
+**Dev-only, off by default** — the Tester tab's "Live mesh demo" panel (`apps/pwa`), see
+`docs/ONBOARDING.md` Section 4.3:
+
+- `GET /demo/mesh-test/capabilities` — `{ available, reasons[] }`.
+- `POST /demo/mesh-test/run` — body `{ "script": "bridge" | "relay-proof" }`. Spawns the
+  matching `packages/mesh-sim` script as a child process. 409 if one is already running (only
+  one at a time, module-level, gone on restart — same ephemerality as the drain worker's own
+  `inFlight` guard, not persisted anywhere).
+- `GET /demo/mesh-test/:jobId/status?after=<n>` — `{ status, newLines[], nextIndex, summary?, error? }`,
+  polled by the panel. `summary` is a parsed PASS/FAIL checklist for `relay-proof`, or the
+  captured `AlertBundle` for `bridge`.
+
+These three routes don't exist at all unless `LIGTAS_ENABLE_MESH_ORCHESTRATION` is set —
+not merely gated per-request. This is deliberately a *stricter* bar than the rest of this
+API: `/alert`, `/alerts`, `/drain`, and `/health` all have zero auth today, matching the
+project's threat model that the hub only ever sits on a barangay's own local network. This
+route spawns local processes, which is categorically more sensitive, so it gets its own
+explicit opt-in rather than quietly inheriting that same "no auth" default — never enable it
+on a hub any judge or the public can reach. CORS for these routes is scoped to themselves
+alone (checked against `LIGTAS_PWA_ORIGIN`, default `http://localhost:5173`); the other four
+routes' cross-origin exposure is unchanged.
+
 ## Verified live, not just unit tested
 
 `packages/mesh-sim/bridge_to_hub.py` drives the full chain for real: Docker-simulated LoRa mesh → a packet arriving at the hub node's own client interface → HTTP POST to this server → real signature verification → SQLite → `GET /alerts`. Run it (with the hub already running) to see a genuine alert accepted and a forged one — which the mesh forwards exactly like a real packet, per PRD Section 5.5 — rejected here instead.

@@ -8,6 +8,7 @@ __pycache__/
 .venv/
 out/
 packages/hub/*.sqlite*
+packages/hub/demo-runs/
 .vercel
 # Contains live Testnet secrets in plaintext -- local rehearsal notes only, never commit.
 docs/DEMO-RECORDING.md

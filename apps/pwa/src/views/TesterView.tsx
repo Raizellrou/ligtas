@@ -12,6 +12,7 @@ import {
   defaultBroadcastOptions,
   tierForLevel,
 } from '../lib/simulation'
+import { LiveMeshPanel } from './LiveMeshPanel'
 
 const HAZARD_OPTIONS = [
   { value: Hazard.RIVER_FLOOD, label: 'River flood' },
@@ -252,6 +253,8 @@ export function TesterView({ sim }: { sim: Simulation }) {
         Issuer key for this browser: <code className="break-all">{sim.testerPublicKey}</code> (index{' '}
         {TESTER_ISSUER_INDEX}, generated locally, holds no funds).
       </p>
+
+      <LiveMeshPanel />
     </div>
   )
 }

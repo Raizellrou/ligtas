@@ -3,13 +3,20 @@ import type { Keypair } from "@stellar/stellar-sdk/base";
 import type Database from "better-sqlite3";
 import { AlertService } from "./alertService.js";
 import { drainOutbox } from "./drain.js";
+import { createDemoRouter } from "./demoRoutes.js";
+import type { MeshTestConfig } from "./meshTestRunner.js";
 
 export interface DrainConfig {
   db: Database.Database;
   issuer: Keypair;
 }
 
-export function createServer(alerts: AlertService, drain?: DrainConfig): Express {
+export interface DemoConfig {
+  meshTest: MeshTestConfig;
+  pwaOrigin: string;
+}
+
+export function createServer(alerts: AlertService, drain?: DrainConfig, demo?: DemoConfig): Express {
   const app = express();
   app.use(express.json());
 
@@ -46,6 +53,10 @@ export function createServer(alerts: AlertService, drain?: DrainConfig): Express
     const summary = await drainOutbox(drain.db, drain.issuer);
     res.json(summary);
   });
+
+  if (demo) {
+    app.use("/demo", createDemoRouter(demo.meshTest, demo.pwaOrigin));
+  }
 
   return app;
 }
