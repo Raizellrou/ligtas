@@ -398,7 +398,7 @@ written 2 September and four commits landed after it. Trust this table over that
 | `packages/hub` | **Done.** Express + SQLite (WAL, `synchronous=FULL`). `POST /alert` verifies via `@ligtas/core`; `GET /alerts` serves a schema-validated live bundle; `POST /drain` anchors the outbox. Server start, `/health` and `/alerts` re-verified today. | `4e6af48`, `041c137` |
 | `packages/stellar` | **Done** — BUILD-PLAN wrongly says "not started". Horizon Testnet client, Friendbot funding, `anchorAlertHash` with `MEMO_HASH`. Proven live on Testnet with the memo decoded independently from Horizon. | `ab5a6b5` |
 | **Hub drain worker** | **Done** — `packages/stellar/README.md` wrongly says "not yet built". Reconciles `submitted` rows before picking up `pending` ones; records the transaction hash before awaiting confirmation. Verified live including a simulated mid-drain crash, which reconciled without double-anchoring. | `041c137`, `packages/hub/src/drain.ts` |
-| `apps/sensor-wokwi` | **Built** — BUILD-PLAN wrongly says "not started" — with one honest gap: real on-device Ed25519 signing cross-checked against the Stellar SDK, sketch compiles clean, but the Wokwi *runtime* was never actually run. | `be9ad22` |
+| `apps/sensor-wokwi` | **Done.** Real on-device Ed25519 signing cross-checked against the Stellar SDK, sketch compiles clean, and the Wokwi runtime itself has now been run live (booted, WiFi connected, LED reacted to the potentiometer). One remaining gap: full Serial output was never captured — the anonymous Wokwi session had no Serial Monitor panel available. | `be9ad22`, `23dd7c0` |
 | `apps/pwa` | **Stage 3 done, Stage 4 not.** Vite + React 19 + Tailwind v4, three roles (Resident / Tester / How it works), real in-browser verification, deployed to Vercel. No service worker and no IndexedDB yet. | `f99b056`, `82caa0d`, `12c4a4f` |
 
 ### Doc drift to fix — small, and worth doing early
@@ -443,8 +443,8 @@ recomputed hash. See `docs/proof/` and item 4.3's PR for how each was verified.
 |---|---|---|---|
 | 5.1 | **Payout flow** | Done | One `createClaimableBalance` per matched household. Flat by severity tier — **tier 1 = 10 XLM, tier 2 = 25 XLM, tier 3 = 50 XLM**, native XLM on Testnet (decided in BUILD-PLAN §6). `payout_status`/`payout_tx` drive the same two-phase durability pattern anchoring already used. Verified live end to end — see `packages/hub/README.md`. |
 | 5.2 | **Registry wiring** | Done | `households` table (household ID → purok → Stellar address) lives in the hub's SQLite DB, seeded from `config/households.json` on startup. `docs/master.md`'s TODO on where it lives is resolved; syncing it across multiple hubs is still genuinely open (PRD §12 #5). |
-| 5.3 | **Idempotency hardening** | Not started | PRD §7 calls this *the highest-risk correctness surface in the system.* Dedicated tests: run the drain, interrupt it, re-run it, assert no double payment. 5.1 is idempotent by construction and that was proven manually (`packages/hub/README.md`) — 5.3 is about proving it with automated tests and covering harder edge cases (Horizon-query fallback when `payout_status` itself is ambiguous). Do not treat this as optional. |
-| 5.4 | Demo recording | Not started | The README's full definition of done, start to finish, uncut. |
+| 5.3 | **Idempotency hardening** | Mostly done | Dedicated Vitest coverage added: crash-before-confirmation reconciled as confirmed without resubmitting, crash-before-network-receipt resubmitted exactly once, and an already-created payout is never re-queried. `packages/hub/test/drain.test.ts`, `3e672d8`. Still open: the Horizon-query fallback for when `payout_status` itself is ambiguous (drain.ts's own docstring names this as explicitly not built). |
+| 5.4 | Demo recording | Not started | The README's full definition of done, start to finish, uncut. **Last item blocking v0.** |
 
 Prerequisite: **the hub's own paying account** must be Friendbot-funded before this stage —
 each claimable balance it creates raises *its own* reserve requirement. Household/claimant
@@ -469,7 +469,7 @@ fabricating a resolution.
 
 - Close the doc drift listed in §6.
 - Replace `apps/pwa/README.md`'s template boilerplate with something real.
-- Run `apps/sensor-wokwi` in an actual Wokwi session to close its one honest gap.
+- ~~Run `apps/sensor-wokwi` in an actual Wokwi session to close its one honest gap.~~ Done (`23dd7c0`) — one narrower gap remains: capturing full Serial output needs a signed-in Wokwi session or the VS Code extension, neither available in an anonymous session.
 - When `development-branch` is next merged into `main` for a submission, decide what to do
   with `CLAUDE.md` and `docs/master.md`. They were removed from the submission repo once
   already (`d100ccd`) and restored here (`1b8dd63`) so both machines share the same
@@ -498,7 +498,7 @@ Naming convention, matching the existing `stage3/core-packet-codec`:
 | Proof capture (4.4) | `stage4/proof-capture` |
 | Claimable-balance payouts (5.1) | `stage5/payout-flow` |
 | Household registry (5.2) | `stage5/registry` |
-| Idempotency tests (5.3) | `stage5/idempotency-tests` |
+| Idempotency tests (5.3) | `stage5/idempotency-tests` — done directly on `development-branch` instead (`3e672d8`), skipping the branch/PR step this table recommends |
 | Doc drift fixes (§6) | `docs/status-drift` |
 
 ### While working
