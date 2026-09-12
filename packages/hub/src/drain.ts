@@ -57,8 +57,28 @@ interface AlertRow {
  * construction: re-running this function never re-submits a payout whose
  * transaction hash is already recorded, since it reconciles that state via
  * Horizon before ever building a new one.
+ *
+ * That construction assumes calls are sequential. index.ts's `setInterval`
+ * doesn't wait for a slow drain (real Horizon round-trips) to finish before
+ * the next tick fires, and `POST /drain` can land mid-cycle too -- either
+ * way, two overlapping calls both read `payout_status = 'none'` before
+ * either writes `'pending'`, and both submit a separate payout for the same
+ * alert. Caught live: a 15s interval overlapped a slow cycle and a second,
+ * redundant payout submission raced in (it happened to fail on a Horizon
+ * 504 rather than double-pay, which is luck, not a guarantee). The
+ * in-flight guard below is the actual fix -- it serializes every caller
+ * onto the same run rather than relying on timing to keep them apart.
  */
-export async function drainOutbox(db: Database.Database, issuer: Keypair): Promise<DrainSummary> {
+let inFlight: Promise<DrainSummary> | null = null;
+
+export function drainOutbox(db: Database.Database, issuer: Keypair): Promise<DrainSummary> {
+  inFlight ??= runDrain(db, issuer).finally(() => {
+    inFlight = null;
+  });
+  return inFlight;
+}
+
+async function runDrain(db: Database.Database, issuer: Keypair): Promise<DrainSummary> {
   const anchors: DrainResult[] = [];
 
   const stuckAnchors = db

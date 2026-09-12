@@ -110,4 +110,38 @@ describe("drainOutbox payout idempotency", () => {
 
     expect(preparePayoutTransaction).toHaveBeenCalledTimes(1);
   });
+
+  // Caught live on 2026-09-12: index.ts's setInterval doesn't wait for a
+  // slow drain to finish before the next tick fires, and POST /drain can
+  // land mid-cycle too. Two overlapping calls both read payout_status =
+  // 'none' before either writes 'pending', so both submit a payout for the
+  // same alert -- a real double-payment risk, not just a duplicate log
+  // line. This reproduces that shape directly: two callers invoke
+  // drainOutbox before either has resolved.
+  it("collapses concurrent calls into a single run instead of double-submitting", async () => {
+    vi.mocked(preparePayoutTransaction).mockResolvedValueOnce({
+      transactionHash: "tx-1",
+      submit: () => Promise.resolve({ ledger: 1, successful: true }),
+    });
+
+    // Two callers -- e.g. index.ts's interval firing while POST /drain is
+    // mid-cycle -- calling drainOutbox before either has resolved. The
+    // guard latches synchronously on the first call, before any awaiting
+    // even starts, so this reproduces the race regardless of how slow the
+    // mocked network calls are.
+    const first = drainOutbox(db, issuer);
+    const second = drainOutbox(db, issuer);
+
+    const [firstSummary, secondSummary] = await Promise.all([first, second]);
+
+    expect(firstSummary).toBe(secondSummary);
+    expect(preparePayoutTransaction).toHaveBeenCalledTimes(1);
+
+    const row = db.prepare("SELECT payout_status, payout_tx FROM alerts WHERE alert_hash = 'alert-1'").get() as {
+      payout_status: string;
+      payout_tx: string;
+    };
+    expect(row.payout_status).toBe("created");
+    expect(row.payout_tx).toBe("tx-1");
+  });
 });
