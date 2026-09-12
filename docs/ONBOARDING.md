@@ -351,6 +351,14 @@ Docker not running is deliberately **not** pre-checked — the job fails at the 
 manual command would, and the real Python traceback streams into the panel's log view rather
 than a guessed diagnosis.
 
+#### Even faster: `scripts/start-demo.bat`
+
+Windows double-click launcher. Copy `packages/hub/.env.example` to `packages/hub/.env`, fill
+in real values once (see §5), then double-click the script — it starts the hub (loading that
+`.env` via Node's own `--env-file` flag, no dotenv dependency) and the PWA dev server in their
+own windows and opens your browser to the Tester tab. After that, the only manual step left
+is having Docker Desktop already running — the script doesn't start Docker for you.
+
 ### 4.4 `packages/stellar` — Horizon Testnet anchoring
 
 Full docs: [`../packages/stellar/README.md`](../packages/stellar/README.md).
