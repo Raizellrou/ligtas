@@ -60,12 +60,23 @@ against a real `@stellar/stellar-sdk` signature:
 
 The sketch itself compiles clean (`arduino-cli compile --fqbn esp32:esp32:esp32`,
 zero errors, zero warnings with `--warnings all`) against the real Arduino-ESP32 core
-3.3.11. What was **not** verified: the actual Wokwi runtime (WiFi/NTP timing,
-`analogRead` behavior against the simulated potentiometer, the `diagram.json` wiring)
-— that needs opening this project in Wokwi itself, which no CLI in this environment
-could do headlessly. Wokwi's own editor will immediately flag a bad connection (a
-disconnected pin just does nothing), so this is a low-risk gap, but it's an honest one
-rather than a claimed one.
+3.3.11.
+
+**Wokwi runtime — since verified.** Opened this exact project in a live wokwi.com
+session (anonymous, no `arduino-cli`/`wokwi-cli` needed): compiled clean on Wokwi's
+own build server, booted, connected to `Wokwi-GUEST`, and the LED reacted correctly
+to the potentiometer's default position (river level already above tier 1). This run
+caught one real bug the throwaway-container check above could never have caught:
+`diagram.json` used `"wokwi-potentiometer-rotary"` as the part type, which is not a
+registered Wokwi part — the correct id is `"wokwi-potentiometer"`. Fixed here. This
+is exactly why the gap below was worth closing rather than waiving: a `diagram.json`
+typo compiles fine and only ever shows up at Wokwi-runtime.
+
+What's still **not** verified in this pass: full Serial output text (the packet hex,
+tier-change logging) was never captured — this session's anonymous Wokwi project had
+no Serial Monitor panel available (likely gated behind sign-in), so the sketch's
+correctness beyond "it boots and the LED responds to GPIO34" is unconfirmed by this
+run. A signed-in session or the Wokwi VS Code extension would close that remainder.
 
 To reproduce the cross-check yourself:
 

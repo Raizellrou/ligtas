@@ -345,10 +345,14 @@ BLAKE2b default, which would produce a non-Stellar-compatible signature) and pri
 84-byte signed packet as hex.
 
 Verified: the signature matches `@stellar/stellar-sdk` byte-for-byte, and the sketch
-compiles clean against Arduino-ESP32 core 3.3.11. **Not verified:** the actual Wokwi
-runtime — WiFi/NTP timing, `analogRead` against the simulated potentiometer, the
-`diagram.json` wiring. If you have a Wokwi session spare, closing that gap is a cheap,
-honest win.
+compiles clean against Arduino-ESP32 core 3.3.11. **Wokwi runtime — since verified**
+too: a live anonymous wokwi.com session booted this exact project, connected WiFi,
+and the LED reacted to the potentiometer. That run caught a real bug —
+`diagram.json` used the part id `wokwi-potentiometer-rotary`, which doesn't exist;
+fixed to `wokwi-potentiometer`. **Still not verified:** full Serial output (the
+anonymous session had no Serial Monitor panel available, likely gated behind
+sign-in) — a signed-in session or the Wokwi VS Code extension would close that
+remainder. See `apps/sensor-wokwi/README.md` for detail.
 
 The `DEMO_SEED` in the sketch is hardcoded and Testnet-only. It is intentionally a
 *different* keypair from the hub's demo issuer — this app is standalone by design.
