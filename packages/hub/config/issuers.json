@@ -3,5 +3,10 @@
     "issuerIndex": 0,
     "issuerPublicKey": "GDOOR3ZRONFFOJ7YXPR47WORRON7WYPDXV6J3SSVGYVGUOV6UBCPLRCF",
     "label": "Barangay captain (hub live test)"
+  },
+  {
+    "issuerIndex": 1,
+    "issuerPublicKey": "GB42PKF46LED6DPEJPKC6YWJ4VW5WIQH5AGLKRFVT6VPTBHIYYH2CZWZ",
+    "label": "Demo-recording issuer (Testnet, generated 2026-09-12)"
   }
 ]
