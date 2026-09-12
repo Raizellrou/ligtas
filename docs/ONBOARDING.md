@@ -386,33 +386,37 @@ plus Friendbot is free and encouraged for local work.
 
 ---
 
-## 6. Audit: what is actually built (as of `12c4a4f`)
+## 6. Audit: what is actually built (originally as of `12c4a4f`; Stage 4/5 rows updated since)
 
 I checked the code against the docs. **`docs/BUILD-PLAN.md` §1 is out of date** — it was
-written 2 September and four commits landed after it. Trust this table over that one.
+written 2 September and many commits landed after it. Trust this table over that one (and see
+§7 below for the fuller Stage 4/5 picture, which has moved further still).
 
 | Package | Real state | Evidence |
 |---|---|---|
-| `packages/core` | **Done.** Packet codec (`DataView`, big-endian, 84 bytes), SEP-53 sign/verify, `ReplayGuard`, `AlertBundle` types, `emit-alert` / `verify-alert` CLIs. 30 Vitest tests passing, typecheck clean. | `pnpm test`, re-verified today |
-| `packages/mesh-sim` | **Done.** 9/9 checks against a live Meshtasticator: multi-hop delivery, relay killed mid-run with the kill independently verified, forged and replayed packets crossing the mesh and rejected at verification. `bridge_to_hub.py` proven against a real running hub. | `55c52b7`, `4e6af48` |
-| `packages/hub` | **Done.** Express + SQLite (WAL, `synchronous=FULL`). `POST /alert` verifies via `@ligtas/core`; `GET /alerts` serves a schema-validated live bundle; `POST /drain` anchors the outbox. Server start, `/health` and `/alerts` re-verified today. | `4e6af48`, `041c137` |
-| `packages/stellar` | **Done** — BUILD-PLAN wrongly says "not started". Horizon Testnet client, Friendbot funding, `anchorAlertHash` with `MEMO_HASH`. Proven live on Testnet with the memo decoded independently from Horizon. | `ab5a6b5` |
-| **Hub drain worker** | **Done** — `packages/stellar/README.md` wrongly says "not yet built". Reconciles `submitted` rows before picking up `pending` ones; records the transaction hash before awaiting confirmation. Verified live including a simulated mid-drain crash, which reconciled without double-anchoring. | `041c137`, `packages/hub/src/drain.ts` |
-| `apps/sensor-wokwi` | **Done.** Real on-device Ed25519 signing cross-checked against the Stellar SDK, sketch compiles clean, and the Wokwi runtime itself has now been run live (booted, WiFi connected, LED reacted to the potentiometer). One remaining gap: full Serial output was never captured — the anonymous Wokwi session had no Serial Monitor panel available. | `be9ad22`, `23dd7c0` |
-| `apps/pwa` | **Stage 3 done, Stage 4 not.** Vite + React 19 + Tailwind v4, three roles (Resident / Tester / How it works), real in-browser verification, deployed to Vercel. No service worker and no IndexedDB yet. | `f99b056`, `82caa0d`, `12c4a4f` |
+| `packages/core` | **Done.** Packet codec (`DataView`, big-endian, 84 bytes), SEP-53 sign/verify, `ReplayGuard`, `AlertBundle` types, `emit-alert` / `verify-alert` CLIs. 36 Vitest tests passing across 6 files, typecheck clean. | `pnpm test` |
+| `packages/mesh-sim` | **Done.** 9/9 checks against a live Meshtasticator: multi-hop delivery, relay killed mid-run with the kill independently verified, forged and replayed packets crossing the mesh and rejected at verification. `bridge_to_hub.py` proven against a real running hub, and since extended to read a configurable demo issuer index (`82c831d`). | `55c52b7`, `4e6af48`, `82c831d` |
+| `packages/hub` | **Done**, and grown well past the original Stage 3 scope. Express + SQLite (WAL, `synchronous=FULL`). `POST /alert` verifies via `@ligtas/core`; `GET /alerts` serves a schema-validated live bundle; `POST /drain` anchors the outbox and runs the payout flow. Drain now serializes concurrent callers onto one in-flight run — a real double-payment race was caught live and fixed (`c6d6127`). | `4e6af48`, `041c137`, `c6d6127` |
+| `packages/stellar` | **Done.** Horizon Testnet client, Friendbot funding, `anchorAlertHash` with `MEMO_HASH`, and `preparePayoutTransaction`. Proven live on Testnet with the memo decoded independently from Horizon. | `ab5a6b5` |
+| **Hub drain worker** | **Done.** Reconciles `submitted`/`pending` rows before picking up new work; records the transaction hash before awaiting confirmation; falls back to querying existing claimable balances when a transaction-hash lookup itself is ambiguous (PRD §7's "where uncertain" case). Verified live including a simulated mid-drain crash, which reconciled without double-anchoring or double-paying. | `041c137`, `packages/hub/src/drain.ts` |
+| `apps/sensor-wokwi` | **Done.** Real on-device Ed25519 signing cross-checked against the Stellar SDK, sketch compiles clean, and the Wokwi runtime itself has been run live (booted, WiFi connected, LED reacted to the potentiometer). One remaining gap: full Serial output was never captured — the anonymous Wokwi session had no Serial Monitor panel available. | `be9ad22`, `23dd7c0` |
+| `apps/pwa` | **Stage 3 and Stage 4 both done.** Vite + React 19 + Tailwind v4, three roles (Resident / Tester / How it works), real in-browser verification, deployed to Vercel, `vite-plugin-pwa` service worker + `idb` persistence in place. | `f99b056`, `82caa0d`, and Stage 4's `apps/pwa` offline-hardening PR |
 
-### Doc drift to fix — small, and worth doing early
+### Doc drift — resolved
 
-These statements are wrong in the repo right now. Fixing them makes a good first PR, to get
-the workflow under your belt on something low-risk:
+These were wrong at the time this section was first written; all are now fixed in the repo
+(most recently as part of finishing off Stage 5 item 5.3 and this audit):
 
-1. `docs/BUILD-PLAN.md` §1 — "Not started: `packages/stellar`, `apps/sensor-wokwi`" is
-   false. Both shipped. It also says "29 Vitest tests"; it is 30.
-2. `packages/stellar/README.md` "Not yet built" — the hub drain worker **is** built.
-3. `CLAUDE.md` — describes `apps/pwa` as using `vite-plugin-pwa` and `idb`.
-   **Neither is in `apps/pwa/package.json`.** That is Stage 4 work that has not happened yet.
-4. `apps/pwa/README.md` is still the stock Vite template boilerplate. Never replaced.
-5. `LIGTAS-PRD.md` §11 also says 29 tests.
+- ~~`docs/BUILD-PLAN.md` §1 — "Not started: `packages/stellar`, `apps/sensor-wokwi`" was
+  false.~~ Fixed: §1 now carries an explicit "this table is stale, see here instead" pointer
+  rather than a status claim that will drift again.
+- ~~`packages/stellar/README.md` "Not yet built" for the hub drain worker.~~ Fixed — the
+  README's own "Built since this README was first written" section covers it.
+- ~~`CLAUDE.md` describing `apps/pwa` as using `vite-plugin-pwa` and `idb` before either was
+  a dependency.~~ Fixed — both are in `apps/pwa/package.json` now.
+- ~~`apps/pwa/README.md` was stock Vite template boilerplate.~~ Replaced with a real README.
+- `LIGTAS-PRD.md` §11 still says 29 tests — cosmetic, low-priority, left as-is; the real
+  count lives in this file and in CI, not in a spec doc that predates the code.
 
 ---
 
@@ -443,8 +447,8 @@ recomputed hash. See `docs/proof/` and item 4.3's PR for how each was verified.
 |---|---|---|---|
 | 5.1 | **Payout flow** | Done | One `createClaimableBalance` per matched household. Flat by severity tier — **tier 1 = 10 XLM, tier 2 = 25 XLM, tier 3 = 50 XLM**, native XLM on Testnet (decided in BUILD-PLAN §6). `payout_status`/`payout_tx` drive the same two-phase durability pattern anchoring already used. Verified live end to end — see `packages/hub/README.md`. |
 | 5.2 | **Registry wiring** | Done | `households` table (household ID → purok → Stellar address) lives in the hub's SQLite DB, seeded from `config/households.json` on startup. `docs/master.md`'s TODO on where it lives is resolved; syncing it across multiple hubs is still genuinely open (PRD §12 #5). |
-| 5.3 | **Idempotency hardening** | Mostly done | Dedicated Vitest coverage added: crash-before-confirmation reconciled as confirmed without resubmitting, crash-before-network-receipt resubmitted exactly once, and an already-created payout is never re-queried. `packages/hub/test/drain.test.ts`, `3e672d8`. Still open: the Horizon-query fallback for when `payout_status` itself is ambiguous (drain.ts's own docstring names this as explicitly not built). |
-| 5.4 | Demo recording | Not started | The README's full definition of done, start to finish, uncut. **Last item blocking v0.** |
+| 5.3 | **Idempotency hardening** | Done | Dedicated Vitest coverage: crash-before-confirmation reconciled as confirmed without resubmitting, crash-before-network-receipt resubmitted exactly once, an already-created payout never re-queried, and concurrent overlapping `drainOutbox` calls collapsed onto one in-flight run (a real double-payment race, caught live and fixed — `c6d6127`). The Horizon-query fallback for when `payout_status` itself is ambiguous is now built too: `reconcilePayoutByExistingBalances` in `packages/hub/src/drain.ts` checks existing claimable balances for the affected households before ever resubmitting. `packages/hub/test/drain.test.ts`. |
+| 5.4 | Demo recording | In progress | The README's full definition of done, start to finish, uncut. A live mesh-to-hub-to-PWA rehearsal run is what surfaced and fixed the 5.1–5.3 bugs above (`556ca0c`…`c6d6127`), so this is actively underway rather than not started — but the recording itself isn't finished, and `apps/pwa/public/alert-bundle.json` has an uncommitted fresh capture pending a decision on whether to keep it. **Last item blocking v0.** |
 
 Prerequisite: **the hub's own paying account** must be Friendbot-funded before this stage —
 each claimable balance it creates raises *its own* reserve requirement. Household/claimant
@@ -467,8 +471,8 @@ fabricating a resolution.
 
 ### Also worth doing
 
-- Close the doc drift listed in §6.
-- Replace `apps/pwa/README.md`'s template boilerplate with something real.
+- ~~Close the doc drift listed in §6.~~ Done — see §6's "Doc drift — resolved".
+- ~~Replace `apps/pwa/README.md`'s template boilerplate with something real.~~ Done.
 - ~~Run `apps/sensor-wokwi` in an actual Wokwi session to close its one honest gap.~~ Done (`23dd7c0`) — one narrower gap remains: capturing full Serial output needs a signed-in Wokwi session or the VS Code extension, neither available in an anonymous session.
 - When `development-branch` is next merged into `main` for a submission, decide what to do
   with `CLAUDE.md` and `docs/master.md`. They were removed from the submission repo once

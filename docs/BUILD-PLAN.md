@@ -6,7 +6,13 @@ Companion to [LIGTAS-PRD.md](../LIGTAS-PRD.md). The PRD says *what* the system i
 
 ## 1. Status
 
-**Built and proven:**
+**This table was written 2 September, at the start of Stage 3, and is stale — every package
+below has since shipped, well past Stage 3.** Trust [`docs/ONBOARDING.md`](ONBOARDING.md) §6
+("Audit: what is actually built") and §7 ("What is left to build") over anything here; they
+are kept current against the tree, this table is not. Left in place, unedited otherwise, as
+the historical record of what Stage 3 looked like at kickoff.
+
+**Built and proven (as of 2 September):**
 
 | Package | State |
 |---|---|
@@ -15,7 +21,9 @@ Companion to [LIGTAS-PRD.md](../LIGTAS-PRD.md). The PRD says *what* the system i
 | `packages/hub` | Express + SQLite (WAL, `synchronous=FULL`). `POST /alert` verifies via `@ligtas/core` and stores; `GET /alerts` serves a live `AlertBundle`, schema-validated against `docs/alert-bundle.schema.json`. Proven against a real mesh-sim run: genuine alert accepted, forged alert crosses the mesh and is rejected at the hub. |
 | `apps/pwa` | Vite + React + Tailwind v4, against `@ligtas/core` directly. Loads a bundle, runs every entry through real `decodePacket`/`verifyBody`/`ReplayGuard` in the browser. Verified visually: instruction card, "not affected" card, purok persistence across reload. |
 
-**Not started:** `packages/stellar`, `apps/sensor-wokwi`.
+**"Not started" at the time this was written:** `packages/stellar`, `apps/sensor-wokwi`.
+**Both have since shipped** — see `docs/ONBOARDING.md` §6, which also has the current Vitest
+count (this table's "29 tests" is out of date too).
 
 **Dependencies verified working on this machine**, so none of them is an unknown when the stage that needs them starts:
 

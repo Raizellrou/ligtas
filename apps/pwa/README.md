@@ -1,32 +1,65 @@
-# React + TypeScript + Vite
+# @ligtas/pwa
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The resident-facing PWA (PRD Section 8 / Stage 3–4). React + Vite + Tailwind v4 against
+`@ligtas/core` directly — every alert is decoded and its signature verified in the browser
+with the real codec, not a mock of it.
 
-Currently, two official plugins are available:
+Served two ways: from the hub's own WiFi during a real deployment (no internet on that
+network), and hosted on Vercel for this build, where it runs against a captured bundle
+instead of a live hub (see "Where the data comes from" below).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Roles
 
-## React Compiler
+Three tabs, persisted in `localStorage` (`ligtas.role`):
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Resident** — the real UI. Shows the evacuation instruction for the resident's own purok,
+  or an explicit "your purok is not affected" state — never a blank screen (PRD Section 8).
+  Purok selection persists across reloads (`usePersistedPurok.ts`).
+- **Tester** — broadcasts a synthetic alert through the same verification path the Resident
+  view uses, for demoing the reject cases (forged signature, replayed sequence) without a
+  live mesh. Uses a reserved issuer index (255, `apps/pwa/src/lib/simulation.ts`) so it can
+  never collide with a real committed demo issuer — see "Two real bugs" in
+  `docs/ONBOARDING.md` §6 for why that boundary matters.
+- **How it works** — static explainer, no live state.
 
-## Expanding the Oxlint configuration
+## Where the data comes from
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+`useSimulation.ts` loads `public/alert-bundle.json` — genuine, forged, and replayed packets
+captured from an actual Meshtasticator run via `packages/mesh-sim/bridge_to_hub.py` against a
+real running `packages/hub` — and runs every entry through `@ligtas/core`'s real
+`decodePacket` / `verifyBody` / `ReplayGuard` in the browser. Anyone with the page open can
+flip a byte in devtools and watch verification fail live; nothing about that check is faked
+for the hosted build.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## Offline hardening (Stage 4)
+
+- `vite-plugin-pwa` (`generateSW` mode) precaches the app shell and the bundled alert data on
+  first visit, so the page still opens with no network.
+- `idb` (`src/lib/alertCache.ts`) persists the most recently fetched bundle to IndexedDB, so a
+  resident who goes fully offline after first load still sees the last alert their device
+  actually received, not a blank screen.
+- Verified by killing the serving process after a normal load and reloading — app shell and
+  the last-known bundle both still rendered, served from the service-worker cache. **Not**
+  verified on a real device in actual airplane mode; see `docs/ONBOARDING.md` §7 for that
+  caveat in context.
+
+## Development
+
+```bash
+pnpm --filter @ligtas/core build   # @ligtas/pwa depends on it as a workspace package
+pnpm --filter @ligtas/pwa dev      # http://localhost:5173
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+```bash
+pnpm --filter @ligtas/pwa build    # tsc -b && vite build, output to dist/
+pnpm --filter @ligtas/pwa lint     # oxlint
+```
+
+One pre-existing lint warning, not new: `src/lib/useSimulation.ts` — `react(use-memo)`,
+tracked in `docs/ONBOARDING.md`'s PR checklist rather than fixed, to avoid unrelated churn.
+
+## Deployment
+
+Deployed to Vercel from Charles's account (`.vercel/` is gitignored). Build config lives in
+`vercel.json` at the repo root: `pnpm --filter @ligtas/core build && pnpm --filter @ligtas/pwa build`,
+output directory `apps/pwa/dist`. See `docs/ONBOARDING.md` Section 4.6 if you need access.
