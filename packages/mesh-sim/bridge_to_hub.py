@@ -38,6 +38,14 @@ HUB_URL = os.environ.get("LIGTAS_HUB_URL", "http://localhost:3001")
 # "genuine" alert. Never hardcode this; the hub's demo issuer secret is
 # generated per session and passed in, never committed.
 ISSUER_SECRET = os.environ["LIGTAS_DEMO_ISSUER_SECRET"]
+# Must match the issuerIndex ISSUER_SECRET's public key is actually
+# registered under in packages/hub/config/issuers.json -- defaults to 0
+# (the original demo issuer) but the config supports more than one entry,
+# so this is overridable rather than hardcoded. Getting this wrong signs a
+# packet with issuer N's key while its issuerIndex byte claims a different
+# issuer, which the hub correctly verifies against the wrong public key and
+# rejects as rejected_signature -- including "genuine" alerts.
+ISSUER_INDEX = int(os.environ.get("LIGTAS_DEMO_ISSUER_INDEX", "0"))
 # The hub only ever persists *accepted* alerts (alertService.ts's ingest()
 # never inserts a rejected packet), so GET /alerts can't supply the
 # forged/replay entries a captured demo bundle needs. This script captures
@@ -93,7 +101,7 @@ try:
     print(f"\nBridge live. Watching hub node {HUB_NODE_ID}'s client interface, POSTing to {HUB_URL}.")
 
     current_label = "genuine -- tier 2, puroks 3 and 4"
-    alert = emit_alert(mode="genuine", sequence=1, issuer_secret=ISSUER_SECRET)
+    alert = emit_alert(mode="genuine", sequence=1, issuer_secret=ISSUER_SECRET, issuer_index=ISSUER_INDEX)
     print(f"Broadcasting genuine alert (seq=1) from node 0...")
     sim.get_node_iface_by_id(0).sendData(
         bytes.fromhex(alert["packetHex"]), destinationId="^all", portNum=driver.PRIVATE_APP_PORT, wantAck=False
@@ -101,7 +109,7 @@ try:
     time.sleep(10)
 
     current_label = "genuine -- tier 2, water risen further"
-    escalation = emit_alert(mode="genuine", sequence=2, issuer_secret=ISSUER_SECRET, water_level=220)
+    escalation = emit_alert(mode="genuine", sequence=2, issuer_secret=ISSUER_SECRET, water_level=220, issuer_index=ISSUER_INDEX)
     print(f"\nBroadcasting genuine escalation alert (seq=2) from node 0...")
     sim.get_node_iface_by_id(0).sendData(
         bytes.fromhex(escalation["packetHex"]), destinationId="^all", portNum=driver.PRIVATE_APP_PORT, wantAck=False
@@ -109,7 +117,7 @@ try:
     time.sleep(10)
 
     current_label = "forged -- signed by an impostor key, not the issuer above"
-    forged = emit_alert(mode="forged", sequence=3, issuer_secret=ISSUER_SECRET)
+    forged = emit_alert(mode="forged", sequence=3, issuer_secret=ISSUER_SECRET, issuer_index=ISSUER_INDEX)
     print(f"\nBroadcasting FORGED alert (seq=3) from node 0...")
     sim.get_node_iface_by_id(0).sendData(
         bytes.fromhex(forged["packetHex"]), destinationId="^all", portNum=driver.PRIVATE_APP_PORT, wantAck=False
@@ -117,7 +125,7 @@ try:
     time.sleep(10)
 
     current_label = "replay -- sequence 1 again (already superseded by sequence 2), different body/hash from alert 0"
-    replay = emit_alert(mode="genuine", sequence=1, issuer_secret=ISSUER_SECRET)
+    replay = emit_alert(mode="genuine", sequence=1, issuer_secret=ISSUER_SECRET, issuer_index=ISSUER_INDEX)
     print(f"\nBroadcasting REPLAY alert (seq=1 again) from node 0...")
     sim.get_node_iface_by_id(0).sendData(
         bytes.fromhex(replay["packetHex"]), destinationId="^all", portNum=driver.PRIVATE_APP_PORT, wantAck=False

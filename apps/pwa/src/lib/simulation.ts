@@ -26,8 +26,20 @@ import {
  * explicit rather than implied, so the UI states it too).
  */
 
-/** The captured bundle already occupies issuer index 0; the tester signs as 1. */
-export const TESTER_ISSUER_INDEX = 1
+/**
+ * Reserved for the browser's own synthetic tester keypair -- must never
+ * collide with a real issuer index from the captured bundle. It used to be
+ * hardcoded to 1 on the assumption the bundle only ever used index 0; that
+ * assumption broke the moment a second real demo issuer (also index 1) was
+ * added to packages/hub/config/issuers.json. useSimulation.ts's issuers
+ * array is captured.issuers with this entry appended after, and
+ * evaluateBundle.ts's issuerByIndex Map keeps the *last* entry on a
+ * duplicate key -- so the tester's own public key silently shadowed the
+ * real issuer 1's, and every genuine alert signed by issuer 1 verified
+ * against the wrong key and came back rejected_signature. 255 (u8 max) is
+ * outside the range any real committed issuer index would plausibly use.
+ */
+export const TESTER_ISSUER_INDEX = 255
 
 /**
  * Thresholds mirroring apps/sensor-wokwi's own tier logic, so the river

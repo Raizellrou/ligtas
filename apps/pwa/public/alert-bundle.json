@@ -1,34 +1,39 @@
 {
   "schemaVersion": 1,
-  "generatedAt": 1788418686,
+  "generatedAt": 1789180596,
   "source": "captured",
-  "captureNote": "Captured 2026-09-03 from a live Meshtasticator run via bridge_to_hub.py against a real running packages/hub. The two genuine alerts were accepted and stored by the hub; the forged and replayed packets crossed the mesh identically (stock Meshtastic firmware forwards any payload) but were rejected on signature/sequence -- their bytes are this script's own record of what it broadcast, since the hub never persists a rejected packet.",
+  "captureNote": "Captured 2026-09-12 from a live Meshtasticator run via bridge_to_hub.py against a real running packages/hub. The two genuine alerts were accepted and stored by the hub; the forged and replayed packets crossed the mesh identically (stock Meshtastic firmware forwards any payload) but were rejected on signature/sequence -- their bytes are this script's own record of what it broadcast, since the hub never persists a rejected packet.",
   "issuers": [
     {
       "issuerIndex": 0,
       "issuerPublicKey": "GDOOR3ZRONFFOJ7YXPR47WORRON7WYPDXV6J3SSVGYVGUOV6UBCPLRCF",
       "label": "Barangay captain (hub live test)"
+    },
+    {
+      "issuerIndex": 1,
+      "issuerPublicKey": "GB42PKF46LED6DPEJPKC6YWJ4VW5WIQH5AGLKRFVT6VPTBHIYYH2CZWZ",
+      "label": "Demo-recording issuer (Testnet, generated 2026-09-12)"
     }
   ],
   "alerts": [
     {
-      "packetHex": "010102000000000c6a991a520000000100bb00004bdbded05cb86957e0f4d61c6ec66a3bfd7053afe472efd85468e0f6d999d5745763c0bb0f5ad4679dd7643a6602a26310d0df1394793859f862046057fc7901",
-      "receivedAt": 1788418644,
+      "packetHex": "010102010000000c6aa4ba880000000100bb0000dd4475356fdf060225ef5a311baca7793400971cb99c8918c42353cbc425f22f381ffa924e74d5aaf1055b66d08b77798809d4d98a5fb520a0d7e8676b66de0f",
+      "receivedAt": 1789180553,
       "demoLabel": "genuine -- tier 2, puroks 3 and 4"
     },
     {
-      "packetHex": "010102000000000c6a991a5e0000000200dc00006163b6bf1b90711d55f39fbc966e0deb9cef6cabbae3c8b05253403c95a6b3b627eed689c56d15ea58fb3bef597a4c529cda95565ed3052dd87406f53ef70b02",
-      "receivedAt": 1788418655,
+      "packetHex": "010102010000000c6aa4ba930000000200dc0000907ad5507251c6e2bbdfffdddea17ec833bf5f7fb916bd46c6a860d93efd7de85b1416a0e94f769e97d7b8f015ec707f4eaa302220c668b7a502be41475fb000",
+      "receivedAt": 1789180565,
       "demoLabel": "genuine -- tier 2, water risen further"
     },
     {
-      "packetHex": "010102000000000c6a991a690000000300bb00009f4a1f8a1f2db281f9aeaa173c04b3a572d13adaa71936deebce451d691c40abc46e18cf94246d2f6152b9b908f2f1f2bf502c7112939ed5017c586b503de600",
-      "receivedAt": 1788418666,
+      "packetHex": "010102010000000c6aa4ba9e0000000300bb0000503734bc3376fb0bc6fcdff52135e6a5ae018ee169d87d47b598aa30021167139c8e2a10f87806450e0c07021406c4bd0ec50db128d1d7357d31c1f87d743f0d",
+      "receivedAt": 1789180576,
       "demoLabel": "forged -- signed by an impostor key, not the issuer above"
     },
     {
-      "packetHex": "010102000000000c6a991a740000000100bb0000fdaf3e6c478be9429bf8e881fca199bbc54963f00ad3eaa9bd4c8c08949570b594ea9959caadc2345f2f16ce2171f160589047582187e8d284149a86b71bba04",
-      "receivedAt": 1788418678,
+      "packetHex": "010102010000000c6aa4baaa0000000100bb0000672a7df9264f207fb78695e407f13b69aa8535da22f360c1d1ed5b0903bf800970d9a2890a8536f23de135b95283945fcedae5c4f821a11579cd25167799a40f",
+      "receivedAt": 1789180587,
       "demoLabel": "replay -- sequence 1 again (already superseded by sequence 2), different body/hash from alert 0"
     }
   ]
