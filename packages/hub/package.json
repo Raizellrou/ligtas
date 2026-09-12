@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
-    "@types/express": "^5.0.0"
+    "@types/express": "^5.0.0",
+    "vitest": "^2.1.8"
   }
 }
