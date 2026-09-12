@@ -2,6 +2,8 @@ import type Database from "better-sqlite3";
 import type { Keypair } from "@stellar/stellar-sdk/base";
 import { bytesFromHex } from "@ligtas/core";
 import {
+  PAYOUT_TIER_AMOUNT_XLM,
+  findMatchingClaimableBalance,
   getTransactionStatus,
   prepareAnchorTransaction,
   preparePayoutTransaction,
@@ -49,14 +51,15 @@ interface AlertRow {
  * two-phase split exists for: the transaction hash is known and persisted
  * before this function ever awaits the network.
  *
- * What this does NOT do: query Horizon for existing claimable balances as
- * a fallback when `payout_status` itself is ambiguous (PRD Section 7's
- * "where uncertain" case). That extra defense-in-depth check, plus
- * dedicated interrupt-and-rerun tests, is Stage 5 item 5.3 (idempotency
- * hardening) -- not built here. What IS built here is idempotent by
- * construction: re-running this function never re-submits a payout whose
- * transaction hash is already recorded, since it reconciles that state via
- * Horizon before ever building a new one.
+ * This is idempotent by construction: re-running this function never
+ * re-submits a payout whose transaction hash is already recorded, since it
+ * reconciles that state via Horizon before ever building a new one. When
+ * even that reconciliation can't get a clean answer (Horizon errors rather
+ * than cleanly saying the transaction was never found), it falls back to
+ * PRD Section 7's "where uncertain" case -- querying Horizon for claimable
+ * balances already sponsored for the affected households, via
+ * `reconcilePayoutByExistingBalances` below -- rather than guessing and
+ * risking a duplicate payout.
  *
  * That construction assumes calls are sequential. index.ts's `setInterval`
  * doesn't wait for a slow drain (real Horizon round-trips) to finish before
@@ -220,7 +223,13 @@ async function reconcilePayout(
   alertHash: string,
   transactionHash: string,
 ): Promise<PayoutDrainResult> {
-  const status = await getTransactionStatus(transactionHash);
+  let status: Awaited<ReturnType<typeof getTransactionStatus>>;
+  try {
+    status = await getTransactionStatus(transactionHash);
+  } catch (err) {
+    return reconcilePayoutByExistingBalances(db, issuer, alertHash, err as Error);
+  }
+
   if (status === "not_found") {
     // Never reached the network -- safe to rebuild and resubmit, same as
     // reconcileAnchor. Needs the alert's severity/purok_bitmap again since
@@ -233,4 +242,45 @@ async function reconcilePayout(
   const outcome: PayoutDrainResult["outcome"] = status === "confirmed" ? "created" : "failed";
   db.prepare("UPDATE alerts SET payout_status = ? WHERE alert_hash = ?").run(outcome, alertHash);
   return { alertHash, outcome };
+}
+
+/**
+ * PRD Section 7's "where uncertain" fallback. Reached only when
+ * getTransactionStatus itself threw -- i.e. Horizon didn't give a clean
+ * not_found, so treating that as "safe to resubmit" (like the not_found
+ * branch above) would risk paying twice. Instead, ask Horizon directly
+ * whether the claimable balances this payout would have created already
+ * exist for every matched household. Only a full match is trusted enough
+ * to mark the payout settled; anything less is left 'pending' so the next
+ * drain retries the direct transaction-hash check, which is the more
+ * precise signal.
+ */
+async function reconcilePayoutByExistingBalances(
+  db: Database.Database,
+  issuer: Keypair,
+  alertHash: string,
+  err: Error,
+): Promise<PayoutDrainResult> {
+  const row = db
+    .prepare<[string], AlertRow>("SELECT severity, purok_bitmap FROM alerts WHERE alert_hash = ?")
+    .get(alertHash)!;
+  const households = matchingHouseholds(db, row.purok_bitmap);
+  const amount = PAYOUT_TIER_AMOUNT_XLM[row.severity as 1 | 2 | 3];
+
+  const alreadySettled =
+    households.length > 0 &&
+    (await Promise.all(
+      households.map((h) => findMatchingClaimableBalance(issuer.publicKey(), h.stellarAddress, amount)),
+    ).then((matches) => matches.every(Boolean)));
+
+  if (alreadySettled) {
+    db.prepare("UPDATE alerts SET payout_status = 'created' WHERE alert_hash = ?").run(alertHash);
+    return { alertHash, outcome: "created", matchedHouseholds: households.length };
+  }
+
+  db.prepare("UPDATE alerts SET attempts = attempts + 1, last_error = ? WHERE alert_hash = ?").run(
+    err.message,
+    alertHash,
+  );
+  return { alertHash, outcome: "failed", matchedHouseholds: households.length };
 }

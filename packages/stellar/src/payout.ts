@@ -88,3 +88,30 @@ export async function preparePayoutTransaction(
     },
   };
 }
+
+/**
+ * PRD Section 7's idempotency fallback: "where uncertain, queries existing
+ * claimable balances for the sponsoring account." Used when a drain run
+ * can't tell a payout transaction's fate from its hash alone (Horizon
+ * returned something other than a clean "not found" -- a transient error,
+ * not proof the transaction never landed), so resubmitting on that
+ * ambiguity would risk creating a second balance for the same household.
+ *
+ * Matches on sponsor + claimant + asset + amount, not a transaction hash,
+ * since that is all a claimable balance record carries -- there is no
+ * alert-hash tag on it. That is an approximation, not a certainty: a
+ * household that separately received an identical flat-tier payout from a
+ * different alert would also match. Accepted here because the caller only
+ * ever uses a "yes" answer to avoid resubmitting a specific already-pending
+ * payout it already believes should exist -- it is a defense against
+ * double-paying that same payout, not a general ledger reconciliation.
+ */
+export async function findMatchingClaimableBalance(
+  sponsor: string,
+  claimantAddress: string,
+  amount: string,
+): Promise<boolean> {
+  const server = horizonClient();
+  const page = await server.claimableBalances().claimant(claimantAddress).sponsor(sponsor).call();
+  return page.records.some((record) => record.asset === "native" && Number(record.amount) === Number(amount));
+}

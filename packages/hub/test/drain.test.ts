@@ -4,12 +4,22 @@ import { Keypair } from "@stellar/stellar-sdk/base";
 import { openDb } from "../src/db.js";
 import { seedHouseholds } from "../src/households.js";
 import { drainOutbox } from "../src/drain.js";
-import { preparePayoutTransaction, getTransactionStatus } from "@ligtas/stellar";
+import {
+  preparePayoutTransaction,
+  getTransactionStatus,
+  findMatchingClaimableBalance,
+  PAYOUT_TIER_AMOUNT_XLM,
+} from "@ligtas/stellar";
 
 vi.mock("@ligtas/stellar", () => ({
   prepareAnchorTransaction: vi.fn(),
   preparePayoutTransaction: vi.fn(),
   getTransactionStatus: vi.fn(),
+  findMatchingClaimableBalance: vi.fn(),
+  // Real values (packages/stellar/src/payout.ts) -- kept here rather than
+  // imported from the mocked-out package, same reasoning as every other
+  // mock in this file.
+  PAYOUT_TIER_AMOUNT_XLM: { 1: "10", 2: "25", 3: "50" },
 }));
 
 const issuer = Keypair.random();
@@ -34,6 +44,7 @@ describe("drainOutbox payout idempotency", () => {
   beforeEach(() => {
     vi.mocked(preparePayoutTransaction).mockReset();
     vi.mocked(getTransactionStatus).mockReset();
+    vi.mocked(findMatchingClaimableBalance).mockReset();
     db = openDb(":memory:");
     seedHouseholds(db, [{ householdId: "hh-001", purok: 1, stellarAddress: "GDUMMY" }]);
     seedConfirmedAlert(db, "alert-1");
@@ -143,5 +154,57 @@ describe("drainOutbox payout idempotency", () => {
     };
     expect(row.payout_status).toBe("created");
     expect(row.payout_tx).toBe("tx-1");
+  });
+
+  // PRD Section 7's "where uncertain" fallback: getTransactionStatus can
+  // throw instead of cleanly answering not_found (a transient Horizon
+  // error, not proof the transaction never landed). Resubmitting on that
+  // ambiguity would risk a second claimable balance for the same
+  // household, so this checks Horizon for the balances directly instead.
+  describe("when the transaction-hash reconciliation itself is ambiguous", () => {
+    beforeEach(async () => {
+      vi.mocked(preparePayoutTransaction).mockResolvedValueOnce({
+        transactionHash: "tx-1",
+        submit: () => Promise.reject(new Error("network dropped")),
+      });
+      await drainOutbox(db, issuer);
+    });
+
+    it("marks the payout created when every matched household already has a matching claimable balance", async () => {
+      vi.mocked(getTransactionStatus).mockRejectedValueOnce(new Error("Horizon 503"));
+      vi.mocked(findMatchingClaimableBalance).mockResolvedValueOnce(true);
+
+      await drainOutbox(db, issuer);
+
+      expect(findMatchingClaimableBalance).toHaveBeenCalledWith(issuer.publicKey(), "GDUMMY", "10");
+      const row = db.prepare("SELECT payout_status, payout_tx FROM alerts WHERE alert_hash = 'alert-1'").get() as {
+        payout_status: string;
+        payout_tx: string;
+      };
+      expect(row.payout_status).toBe("created");
+      // The tx hash from the original (uncertain) attempt is left as-is --
+      // this path confirms the payout landed, it doesn't learn which
+      // transaction did it.
+      expect(row.payout_tx).toBe("tx-1");
+      expect(preparePayoutTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves the payout pending, not resubmitted, when the balances don't all match", async () => {
+      vi.mocked(getTransactionStatus).mockRejectedValueOnce(new Error("Horizon 503"));
+      vi.mocked(findMatchingClaimableBalance).mockResolvedValueOnce(false);
+
+      await drainOutbox(db, issuer);
+
+      const row = db.prepare("SELECT payout_status, payout_tx, last_error FROM alerts WHERE alert_hash = 'alert-1'").get() as {
+        payout_status: string;
+        payout_tx: string;
+        last_error: string;
+      };
+      expect(row.payout_status).toBe("pending");
+      expect(row.payout_tx).toBe("tx-1");
+      expect(row.last_error).toBe("Horizon 503");
+      // Never resubmitted -- an ambiguous answer must not risk a double pay.
+      expect(preparePayoutTransaction).toHaveBeenCalledTimes(1);
+    });
   });
 });
