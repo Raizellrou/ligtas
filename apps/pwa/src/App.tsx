@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useSimulation } from './lib/useSimulation'
+import { useHouseholdCheckin } from './lib/useHouseholdCheckin'
 import { ResidentView } from './views/ResidentView'
 import { TesterView } from './views/TesterView'
 import { HowItWorksView } from './views/HowItWorksView'
@@ -20,6 +21,7 @@ function App() {
     return stored === 'tester' || stored === 'how' ? stored : 'resident'
   })
   const sim = useSimulation()
+  const checkin = useHouseholdCheckin()
 
   function setRole(next: Role) {
     localStorage.setItem(ROLE_STORAGE_KEY, next)
@@ -64,7 +66,13 @@ function App() {
           </p>
         )}
 
-        {role === 'resident' && <ResidentView alerts={sim.evaluated} />}
+        {checkin.pendingCount > 0 && role !== 'how' && (
+          <p className="mb-4 rounded border border-sky-700 bg-sky-900/40 p-2 text-xs text-sky-200">
+            {checkin.pendingCount} check-in{checkin.pendingCount === 1 ? '' : 's'} pending sync.
+          </p>
+        )}
+
+        {role === 'resident' && <ResidentView alerts={sim.evaluated} checkin={checkin} />}
         {role === 'tester' && <TesterView sim={sim} />}
         {role === 'how' && <HowItWorksView />}
       </div>

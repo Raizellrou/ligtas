@@ -11,6 +11,8 @@ export interface HouseholdRecord {
   householdId: string;
   purok: number;
   stellarAddress: string;
+  /** Short code residents type in to join this household's check-in group, e.g. "BLU-482". */
+  joinCode: string;
 }
 
 export function loadHouseholds(path: string): HouseholdRecord[] {
@@ -23,13 +25,36 @@ export function loadHouseholds(path: string): HouseholdRecord[] {
  * populated -- the registry file on disk is always the source of truth.
  */
 export function seedHouseholds(db: Database.Database, households: HouseholdRecord[]): void {
+  const codes = new Set<string>();
+  for (const row of households) {
+    if (codes.has(row.joinCode)) {
+      throw new Error(`duplicate join code "${row.joinCode}" in households registry`);
+    }
+    codes.add(row.joinCode);
+  }
+
   const insert = db.prepare(
-    "INSERT OR REPLACE INTO households (household_id, purok, stellar_address) VALUES (?, ?, ?)",
+    "INSERT OR REPLACE INTO households (household_id, purok, stellar_address, join_code) VALUES (?, ?, ?, ?)",
   );
   const insertAll = db.transaction((rows: HouseholdRecord[]) => {
-    for (const row of rows) insert.run(row.householdId, row.purok, row.stellarAddress);
+    for (const row of rows) insert.run(row.householdId, row.purok, row.stellarAddress, row.joinCode);
   });
   insertAll(households);
+}
+
+/** Resolves a resident-typed join code to a household id, or undefined if unrecognized. */
+export function findHouseholdByJoinCode(db: Database.Database, joinCode: string): string | undefined {
+  const row = db.prepare<[string], { householdId: string }>(
+    "SELECT household_id AS householdId FROM households WHERE join_code = ?",
+  ).get(joinCode);
+  return row?.householdId;
+}
+
+export function householdExists(db: Database.Database, householdId: string): boolean {
+  const row = db.prepare<[string], { one: number }>(
+    "SELECT 1 AS one FROM households WHERE household_id = ?",
+  ).get(householdId);
+  return row !== undefined;
 }
 
 /**

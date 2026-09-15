@@ -46,7 +46,7 @@ describe("drainOutbox payout idempotency", () => {
     vi.mocked(getTransactionStatus).mockReset();
     vi.mocked(findMatchingClaimableBalance).mockReset();
     db = openDb(":memory:");
-    seedHouseholds(db, [{ householdId: "hh-001", purok: 1, stellarAddress: "GDUMMY" }]);
+    seedHouseholds(db, [{ householdId: "hh-001", purok: 1, stellarAddress: "GDUMMY", joinCode: "TST-001" }]);
     seedConfirmedAlert(db, "alert-1");
   });
 

@@ -8,6 +8,7 @@ import {
   type AlertBody,
   type AlertBundle,
 } from '@ligtas/core'
+import { purokBitSet } from './instructions'
 
 /**
  * What actually happened to one alert, independent of its bundle demoLabel.
@@ -66,4 +67,14 @@ export function evaluateBundle(bundle: AlertBundle): EvaluatedAlert[] {
   }
 
   return results
+}
+
+/**
+ * The most recent accepted alert that actually applies to a given purok --
+ * shared by ResidentView's AlertList (the red instruction banner) and
+ * EvacuationMap (urgent styling), so the two surfaces can't silently
+ * disagree about what's currently active for this resident.
+ */
+export function latestRelevantAlert(alerts: EvaluatedAlert[], purok: number): EvaluatedAlert | undefined {
+  return alerts.filter((a) => a.outcome === 'accepted' && a.body && purokBitSet(a.body.purokBitmap, purok)).at(-1)
 }

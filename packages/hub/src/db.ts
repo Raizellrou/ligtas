@@ -27,11 +27,28 @@ CREATE TABLE IF NOT EXISTS alerts (
 
 -- Registry (PRD Section 4, layer L5): household -> purok -> Stellar address,
 -- populated ahead of any disaster. Off-chain and local to this hub, per the
--- PRD; not something field nodes or the PWA ever see.
+-- PRD; not something field nodes or the PWA ever see. join_code is added
+-- separately below via ALTER TABLE (see openDb) since this table predates
+-- the household check-in feature and IF NOT EXISTS won't retrofit a column
+-- onto a table that already exists on disk.
 CREATE TABLE IF NOT EXISTS households (
   household_id    TEXT PRIMARY KEY,
   purok           INTEGER NOT NULL,
   stellar_address TEXT NOT NULL
+);
+
+-- Household safety check-in: per-member status, keyed by (household, name)
+-- so each phone that joins a household gets its own row rather than one
+-- shared flag. client_checkin_id is the PWA's offline-queue entry id,
+-- reused here purely as an idempotency key -- a dropped-response retry of
+-- the same queued tap must not be mistaken for a genuine second update.
+CREATE TABLE IF NOT EXISTS checkins (
+  household_id      TEXT NOT NULL,
+  display_name       TEXT NOT NULL,
+  status              TEXT NOT NULL,
+  updated_at          INTEGER NOT NULL,
+  client_checkin_id   TEXT NOT NULL,
+  PRIMARY KEY (household_id, display_name)
 );
 `;
 
@@ -44,5 +61,20 @@ export function openDb(path: string): Database.Database {
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = FULL");
   db.exec(SCHEMA);
+  migrateHouseholdsJoinCode(db);
   return db;
+}
+
+/**
+ * This codebase otherwise has no migration framework -- schema changes are
+ * additive-only via idempotent CREATE TABLE IF NOT EXISTS. households is the
+ * first table to need a column added after already shipping, so a small
+ * guarded ALTER TABLE stands in rather than inventing a whole migration
+ * system for one column.
+ */
+function migrateHouseholdsJoinCode(db: Database.Database): void {
+  const columns = db.prepare("PRAGMA table_info(households)").all() as { name: string }[];
+  if (!columns.some((c) => c.name === "join_code")) {
+    db.exec("ALTER TABLE households ADD COLUMN join_code TEXT");
+  }
 }

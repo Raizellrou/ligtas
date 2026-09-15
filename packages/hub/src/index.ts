@@ -64,7 +64,7 @@ const demoConfig: DemoConfig | undefined = ENABLE_MESH_ORCHESTRATION
     }
   : undefined;
 
-const app = createServer(alerts, drainConfig, demoConfig);
+const app = createServer(alerts, db, PWA_ORIGIN, drainConfig, demoConfig);
 
 app.listen(PORT, () => {
   console.log(

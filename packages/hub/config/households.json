@@ -2,16 +2,19 @@
   {
     "householdId": "hh-001",
     "purok": 3,
-    "stellarAddress": "GAIXEQPJKEN5N4PJLA54DCE7FQJMP6SNCKSC4P6SB4AQZLLZVFOCRNIE"
+    "stellarAddress": "GAIXEQPJKEN5N4PJLA54DCE7FQJMP6SNCKSC4P6SB4AQZLLZVFOCRNIE",
+    "joinCode": "BLU-482"
   },
   {
     "householdId": "hh-002",
     "purok": 3,
-    "stellarAddress": "GCLB2B6L2TKWZKGYONAJNI7AW2X3QXCD24X3XZU2ZPNUKU4RTIBP3ZXR"
+    "stellarAddress": "GCLB2B6L2TKWZKGYONAJNI7AW2X3QXCD24X3XZU2ZPNUKU4RTIBP3ZXR",
+    "joinCode": "GRN-113"
   },
   {
     "householdId": "hh-003",
     "purok": 4,
-    "stellarAddress": "GCMTOHW2UWYZRAWY3LVJGZF7E32RNOUPEE37ZGPAXDRNUMPGH3WIQAGJ"
+    "stellarAddress": "GCMTOHW2UWYZRAWY3LVJGZF7E32RNOUPEE37ZGPAXDRNUMPGH3WIQAGJ",
+    "joinCode": "AMB-207"
   }
 ]

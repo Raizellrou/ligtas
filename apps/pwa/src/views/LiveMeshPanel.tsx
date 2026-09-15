@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AlertBundle } from '@ligtas/core'
 import { evaluateBundle } from '../lib/evaluateBundle'
+import { HUB_URL } from '../lib/hubUrl'
 
-const HUB_URL = (import.meta.env.VITE_LIGTAS_HUB_URL as string | undefined) ?? 'http://localhost:3001'
 const POLL_MS = 1500
 
 type ScriptKey = 'bridge' | 'relay-proof'

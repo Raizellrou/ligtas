@@ -1,6 +1,9 @@
-import type { EvaluatedAlert } from '../lib/evaluateBundle'
-import { instructionFor, purokBitSet, severityLabel } from '../lib/instructions'
+import { latestRelevantAlert, type EvaluatedAlert } from '../lib/evaluateBundle'
+import { instructionFor, severityLabel } from '../lib/instructions'
 import { usePersistedPurok } from '../usePersistedPurok'
+import type { UseHouseholdCheckin } from '../lib/useHouseholdCheckin'
+import { HouseholdCheckin } from './HouseholdCheckin'
+import { EvacuationMap } from './EvacuationMap'
 
 const OUTCOME_LABEL: Record<EvaluatedAlert['outcome'], string> = {
   accepted: 'Verified',
@@ -10,7 +13,7 @@ const OUTCOME_LABEL: Record<EvaluatedAlert['outcome'], string> = {
   duplicate: 'Duplicate (already seen)',
 }
 
-export function ResidentView({ alerts }: { alerts: EvaluatedAlert[] | null }) {
+export function ResidentView({ alerts, checkin }: { alerts: EvaluatedAlert[] | null; checkin: UseHouseholdCheckin }) {
   const { purok, setPurok, clearPurok } = usePersistedPurok()
 
   if (purok === null) return <PurokPicker onSelect={setPurok} />
@@ -23,6 +26,10 @@ export function ResidentView({ alerts }: { alerts: EvaluatedAlert[] | null }) {
           Purok {purok} · change
         </button>
       </div>
+
+      <HouseholdCheckin {...checkin} />
+
+      <EvacuationMap purok={purok} alerts={alerts} />
 
       {alerts === null ? (
         <p className="text-slate-400">Loading alerts…</p>
@@ -56,8 +63,7 @@ function PurokPicker({ onSelect }: { onSelect: (p: number) => void }) {
 
 function AlertList({ alerts, purok }: { alerts: EvaluatedAlert[]; purok: number }) {
   const accepted = alerts.filter((a) => a.outcome === 'accepted' && a.body)
-  const relevant = accepted.filter((a) => purokBitSet(a.body!.purokBitmap, purok))
-  const latest = relevant.at(-1)
+  const latest = latestRelevantAlert(alerts, purok)
 
   return (
     <>

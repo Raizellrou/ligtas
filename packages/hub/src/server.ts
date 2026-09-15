@@ -4,6 +4,7 @@ import type Database from "better-sqlite3";
 import { AlertService } from "./alertService.js";
 import { drainOutbox } from "./drain.js";
 import { createDemoRouter } from "./demoRoutes.js";
+import { createHouseholdRouter } from "./householdRoutes.js";
 import type { MeshTestConfig } from "./meshTestRunner.js";
 
 export interface DrainConfig {
@@ -16,9 +17,17 @@ export interface DemoConfig {
   pwaOrigin: string;
 }
 
-export function createServer(alerts: AlertService, drain?: DrainConfig, demo?: DemoConfig): Express {
+export function createServer(
+  alerts: AlertService,
+  db: Database.Database,
+  pwaOrigin: string,
+  drain?: DrainConfig,
+  demo?: DemoConfig,
+): Express {
   const app = express();
   app.use(express.json());
+
+  app.use("/household", createHouseholdRouter(db, pwaOrigin));
 
   app.get("/health", (_req, res) => {
     res.json({ ok: true });
