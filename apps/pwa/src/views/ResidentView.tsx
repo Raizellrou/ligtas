@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { latestRelevantAlert, type EvaluatedAlert } from '../lib/evaluateBundle'
 import { instructionFor, severityLabel } from '../lib/instructions'
 import { usePersistedPurok } from '../usePersistedPurok'
@@ -75,6 +76,7 @@ function PurokPicker({ onSelect }: { onSelect: (p: number) => void }) {
 }
 
 function AlertList({ alerts, purok }: { alerts: EvaluatedAlert[]; purok: number }) {
+  const [showLog, setShowLog] = useState(false)
   const accepted = alerts.filter((a) => a.outcome === 'accepted' && a.body)
   const latest = latestRelevantAlert(alerts, purok)
 
@@ -92,26 +94,31 @@ function AlertList({ alerts, purok }: { alerts: EvaluatedAlert[]; purok: number 
         </div>
       )}
 
-      <h3 className="mb-2 text-sm font-semibold text-ink-2">All alerts (verification log)</h3>
-      <ul className="space-y-1">
-        {alerts.map((a) => (
-          <li
-            key={a.index}
-            className={`rounded border p-2 text-xs ${
-              a.outcome === 'accepted' ? 'border-success bg-success-bg' : 'border-border bg-surface'
-            }`}
-          >
-            <span className="font-mono">{OUTCOME_LABEL[a.outcome]}</span>
-            {a.body && (
-              <span className="text-ink-2">
-                {' '}
-                — {severityLabel(a.body.severity)}, puroks bitmap {a.body.purokBitmap.toString(2).padStart(8, '0')}
-              </span>
-            )}
-            {a.demoLabel && <span className="text-ink-3"> ({a.demoLabel})</span>}
-          </li>
-        ))}
-      </ul>
+      <button onClick={() => setShowLog((v) => !v)} className="mb-2 text-xs text-ink-3 underline hover:text-ink-2">
+        {showLog ? 'Hide' : 'Show'} verification details ({alerts.length})
+      </button>
+
+      {showLog && (
+        <ul className="space-y-1">
+          {alerts.map((a) => (
+            <li
+              key={a.index}
+              className={`rounded border p-2 text-xs ${
+                a.outcome === 'accepted' ? 'border-success bg-success-bg' : 'border-border bg-surface'
+              }`}
+            >
+              <span className="font-mono">{OUTCOME_LABEL[a.outcome]}</span>
+              {a.body && (
+                <span className="text-ink-2">
+                  {' '}
+                  — {severityLabel(a.body.severity)}, puroks bitmap {a.body.purokBitmap.toString(2).padStart(8, '0')}
+                </span>
+              )}
+              {a.demoLabel && <span className="text-ink-3"> ({a.demoLabel})</span>}
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   )
 }

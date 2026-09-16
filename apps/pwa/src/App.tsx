@@ -9,9 +9,12 @@ type Role = 'resident' | 'tester' | 'how'
 
 const ROLE_STORAGE_KEY = 'ligtas.role'
 
-const ROLES: { id: Role; label: string }[] = [
+// Resident and How-it-works are real, peer-level surfaces of the product.
+// Simulator is not a third one -- it's a stand-in for hardware that doesn't
+// physically exist in this project, kept separate below so it doesn't read
+// as an equal option a real user would pick.
+const PRIMARY_ROLES: { id: Role; label: string }[] = [
   { id: 'resident', label: 'Resident' },
-  { id: 'tester', label: 'Tester' },
   { id: 'how', label: 'How it works' },
 ]
 
@@ -52,7 +55,7 @@ function App() {
             <span className="text-[10px] uppercase tracking-wide text-ink-3">Testnet demo</span>
           </div>
           <nav className="flex gap-1 rounded-lg bg-surface border border-border p-1" aria-label="Role">
-            {ROLES.map((r) => (
+            {PRIMARY_ROLES.map((r) => (
               <button
                 key={r.id}
                 onClick={() => setRole(r.id)}
@@ -90,6 +93,15 @@ function App() {
         {role === 'resident' && <ResidentView alerts={sim.evaluated} checkin={checkin} offline={sim.offline} />}
         {role === 'tester' && <TesterView sim={sim} />}
         {role === 'how' && <HowItWorksView />}
+
+        <div className="mt-10 border-t border-border pt-3 text-center">
+          <button
+            onClick={() => setRole('tester')}
+            className={`text-xs underline ${role === 'tester' ? 'font-semibold text-ink-2' : 'text-ink-3 hover:text-ink-2'}`}
+          >
+            {role === 'tester' ? 'Viewing the simulator' : 'Open the simulator (stands in for the sensor hardware)'}
+          </button>
+        </div>
       </div>
     </div>
   )

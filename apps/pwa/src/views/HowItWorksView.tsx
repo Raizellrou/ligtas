@@ -89,7 +89,7 @@ export function HowItWorksView() {
         <h3 className="text-sm font-semibold text-ink">Try it yourself</h3>
         <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-xs leading-relaxed text-ink-2">
           <li>
-            Open <strong className="text-ink">Tester</strong> and drag the river gauge past 200 cm.
+            Open <strong className="text-ink">Simulator</strong> and drag the river gauge past 200 cm.
           </li>
           <li>
             Send a <strong className="text-ink">genuine</strong> alert, then switch to{' '}

@@ -6,6 +6,28 @@ const STATUS_LABEL: Record<'safe' | 'need_help', string> = {
   need_help: 'Need help',
 }
 
+// Icon-plus-text, not text alone -- a color/shape a viewer can recognize
+// at a glance beats reading "Safe" vs "Need help" every row, especially for
+// anyone who reads slowly or not in this language at all.
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8" />
+      <path d="M7.5 12.5l3 3 6-6.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+function HelpIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3L2 20h20L12 3z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <line x1="12" y1="10" x2="12" y2="14.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="17" r="1" fill="currentColor" />
+    </svg>
+  )
+}
+
 export function HouseholdCheckin(props: UseHouseholdCheckin) {
   if (!props.joined) return <JoinHouseholdForm join={props.join} />
   return <StatusPanel {...props} />
@@ -72,15 +94,17 @@ function StatusPanel({ householdId, displayName, roster, pendingCount, submit, l
         <button
           type="button"
           onClick={() => submit('safe')}
-          className="rounded border border-success bg-success-bg py-2 text-sm font-semibold text-success hover:bg-success-bg/70"
+          className="flex items-center justify-center gap-1.5 rounded border border-success bg-success-bg py-2 text-sm font-semibold text-success hover:bg-success-bg/70"
         >
+          <CheckIcon />
           I'm safe
         </button>
         <button
           type="button"
           onClick={() => submit('need_help')}
-          className="rounded border border-danger bg-danger-bg py-2 text-sm font-semibold text-danger-deep hover:bg-danger-bg/70"
+          className="flex items-center justify-center gap-1.5 rounded border border-danger bg-danger-bg py-2 text-sm font-semibold text-danger-deep hover:bg-danger-bg/70"
         >
+          <HelpIcon />
           I need help
         </button>
       </div>
@@ -102,7 +126,10 @@ function StatusPanel({ householdId, displayName, roster, pendingCount, submit, l
               <span className={m.displayName === displayName ? 'font-semibold text-ink' : 'text-ink-2'}>
                 {m.displayName}
               </span>
-              <span className={m.status === 'safe' ? 'text-success' : 'text-danger'}>{STATUS_LABEL[m.status]}</span>
+              <span className={`flex items-center gap-1 ${m.status === 'safe' ? 'text-success' : 'text-danger'}`}>
+                {m.status === 'safe' ? <CheckIcon /> : <HelpIcon />}
+                {STATUS_LABEL[m.status]}
+              </span>
             </li>
           ))}
         </ul>

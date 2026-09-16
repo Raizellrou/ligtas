@@ -69,7 +69,7 @@ export function TesterView({ sim }: { sim: Simulation }) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3">Tester — control room</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3">Simulator — sensor stand-in</h2>
         <p className="mt-1 text-xs text-ink-3">
           Every packet below is really built and really signed in this browser by{' '}
           <code className="text-ink-2">@ligtas/core</code>. Nothing tells the resident view what kind of packet it
@@ -82,6 +82,7 @@ export function TesterView({ sim }: { sim: Simulation }) {
           <h3 className="text-sm font-semibold text-ink">River gauge</h3>
           <TierBadge tier={tier} levelCm={riverLevelCm} />
         </div>
+        <SensorVisual tier={tier} levelCm={riverLevelCm} />
         <input
           type="range"
           min={0}
@@ -272,6 +273,55 @@ function BroadcastButton({
       <span className="block text-sm font-semibold text-ink">{title}</span>
       <span className="mt-0.5 block text-[11px] text-ink-2">{subtitle}</span>
     </button>
+  )
+}
+
+const TIER_FILL: Record<number, string> = {
+  0: 'var(--color-info)',
+  1: 'var(--color-accent)',
+  2: 'var(--color-accent-deep)',
+  3: 'var(--color-danger)',
+}
+
+/**
+ * A picture of the thing the slider is standing in for. The controls below
+ * are abstract (a slider, a number) -- this ties them back to "there is a
+ * sensor mounted over a river, and this is what it would be seeing," so the
+ * simulator reads as a stand-in for hardware rather than an unexplained
+ * dashboard.
+ */
+function SensorVisual({ tier, levelCm }: { tier: number; levelCm: number }) {
+  const GROUND_Y = 66
+  const TOP_Y = 8
+  const usable = GROUND_Y - TOP_Y
+  const levelY = GROUND_Y - Math.min(1, levelCm / RIVER_MAX_CM) * usable
+  const fill = TIER_FILL[tier] ?? TIER_FILL[0]
+
+  const thresholds = [
+    { label: 'T1', cm: TIER_1_CM },
+    { label: 'T2', cm: TIER_2_CM },
+    { label: 'T3', cm: TIER_3_CM },
+  ].map((t) => ({ ...t, y: GROUND_Y - Math.min(1, t.cm / RIVER_MAX_CM) * usable }))
+
+  return (
+    <svg viewBox="0 0 300 72" className="mb-2 w-full rounded bg-bg-alt/50" aria-hidden="true">
+      <rect x={0} y={levelY} width={300} height={GROUND_Y - levelY} fill={fill} fillOpacity={0.3} />
+      <line x1={0} y1={levelY} x2={300} y2={levelY} stroke={fill} strokeWidth={2} />
+      <line x1={0} y1={GROUND_Y} x2={300} y2={GROUND_Y} stroke="var(--color-border)" strokeWidth={1} />
+
+      {thresholds.map((t) => (
+        <g key={t.label}>
+          <line x1={0} y1={t.y} x2={300} y2={t.y} stroke="var(--color-ink-3)" strokeOpacity={0.4} strokeWidth={1} strokeDasharray="3 3" />
+          <text x={4} y={t.y - 2} fill="var(--color-ink-3)" fontSize={8}>
+            {t.label}
+          </text>
+        </g>
+      ))}
+
+      <line x1={272} y1={18} x2={272} y2={GROUND_Y} stroke="var(--color-ink-3)" strokeWidth={2} />
+      <rect x={260} y={2} width={24} height={16} rx={3} fill="var(--color-surface)" stroke={fill} strokeWidth={2} />
+      <circle cx={272} cy={10} r={3} fill={fill} />
+    </svg>
   )
 }
 
