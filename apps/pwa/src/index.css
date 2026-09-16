@@ -1,1 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Lora', Georgia, 'Times New Roman', serif;
+
+  --color-bg: oklch(97% 0.014 80);
+  --color-bg-alt: oklch(94% 0.02 75);
+  --color-surface: oklch(99% 0.006 80);
+  --color-border: oklch(88% 0.02 75);
+
+  --color-ink: oklch(24% 0.025 55);
+  --color-ink-2: oklch(46% 0.02 55);
+  --color-ink-3: oklch(62% 0.015 55);
+
+  --color-accent: oklch(72% 0.15 70);
+  --color-accent-deep: oklch(58% 0.15 68);
+  --color-accent-bg: oklch(95% 0.04 70);
+
+  --color-info: oklch(52% 0.09 210);
+  --color-info-bg: oklch(93% 0.03 210);
+
+  --color-success: oklch(58% 0.13 150);
+  --color-success-bg: oklch(94% 0.045 150);
+
+  --color-danger: oklch(54% 0.18 25);
+  --color-danger-deep: oklch(44% 0.17 25);
+  --color-danger-bg: oklch(95% 0.035 30);
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-ink);
+}

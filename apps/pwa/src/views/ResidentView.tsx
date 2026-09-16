@@ -13,7 +13,15 @@ const OUTCOME_LABEL: Record<EvaluatedAlert['outcome'], string> = {
   duplicate: 'Duplicate (already seen)',
 }
 
-export function ResidentView({ alerts, checkin }: { alerts: EvaluatedAlert[] | null; checkin: UseHouseholdCheckin }) {
+export function ResidentView({
+  alerts,
+  checkin,
+  offline,
+}: {
+  alerts: EvaluatedAlert[] | null
+  checkin: UseHouseholdCheckin
+  offline: boolean
+}) {
   const { purok, setPurok, clearPurok } = usePersistedPurok()
 
   if (purok === null) return <PurokPicker onSelect={setPurok} />
@@ -21,10 +29,16 @@ export function ResidentView({ alerts, checkin }: { alerts: EvaluatedAlert[] | n
   return (
     <>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Resident</h2>
-        <button onClick={clearPurok} className="text-sm text-slate-400 underline">
-          Purok {purok} · change
-        </button>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3">Resident</h2>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-ink-2">
+            <span className={`h-1.5 w-1.5 rounded-full ${offline ? 'bg-ink-3' : 'bg-info'}`} />
+            Purok {purok} · {offline ? 'offline' : 'online'}
+          </span>
+          <button onClick={clearPurok} className="text-sm text-ink-2 underline">
+            change
+          </button>
+        </div>
       </div>
 
       <HouseholdCheckin {...checkin} />
@@ -32,7 +46,7 @@ export function ResidentView({ alerts, checkin }: { alerts: EvaluatedAlert[] | n
       <EvacuationMap purok={purok} alerts={alerts} />
 
       {alerts === null ? (
-        <p className="text-slate-400">Loading alerts…</p>
+        <p className="text-ink-2">Loading alerts…</p>
       ) : (
         <AlertList alerts={alerts} purok={purok} />
       )}
@@ -43,15 +57,14 @@ export function ResidentView({ alerts, checkin }: { alerts: EvaluatedAlert[] | n
 function PurokPicker({ onSelect }: { onSelect: (p: number) => void }) {
   return (
     <div className="mx-auto max-w-sm">
-      <p className="mb-4 text-sm text-slate-400">
-        Select your purok to see evacuation instructions for your area.
-      </p>
+      <p className="mb-1 text-sm font-semibold text-ink">Select your purok</p>
+      <p className="mb-4 text-xs text-ink-3">Piliin ang inyong purok — to see evacuation instructions for your area.</p>
       <div className="grid grid-cols-6 gap-2">
         {Array.from({ length: 12 }, (_, i) => i + 1).map((p) => (
           <button
             key={p}
             onClick={() => onSelect(p)}
-            className="aspect-square rounded bg-slate-800 font-semibold hover:bg-slate-700"
+            className="aspect-square rounded-lg border border-border bg-surface font-semibold text-ink hover:bg-bg-alt"
           >
             {p}
           </button>
@@ -70,32 +83,32 @@ function AlertList({ alerts, purok }: { alerts: EvaluatedAlert[]; purok: number 
       {latest ? (
         <InstructionCard alert={latest} />
       ) : accepted.length > 0 ? (
-        <div className="mb-6 rounded border border-slate-800 bg-slate-900 p-4">
-          <p className="text-slate-300">Your purok is not affected by any current alert.</p>
+        <div className="mb-6 rounded border border-border bg-surface p-4">
+          <p className="text-ink-2">Your purok is not affected by any current alert.</p>
         </div>
       ) : (
-        <div className="mb-6 rounded border border-slate-800 bg-slate-900 p-4">
-          <p className="text-slate-300">No alerts.</p>
+        <div className="mb-6 rounded border border-border bg-surface p-4">
+          <p className="text-ink-2">No alerts.</p>
         </div>
       )}
 
-      <h3 className="mb-2 text-sm font-semibold text-slate-400">All alerts (verification log)</h3>
+      <h3 className="mb-2 text-sm font-semibold text-ink-2">All alerts (verification log)</h3>
       <ul className="space-y-1">
         {alerts.map((a) => (
           <li
             key={a.index}
             className={`rounded border p-2 text-xs ${
-              a.outcome === 'accepted' ? 'border-emerald-800 bg-emerald-950/40' : 'border-slate-800 bg-slate-900'
+              a.outcome === 'accepted' ? 'border-success bg-success-bg' : 'border-border bg-surface'
             }`}
           >
             <span className="font-mono">{OUTCOME_LABEL[a.outcome]}</span>
             {a.body && (
-              <span className="text-slate-400">
+              <span className="text-ink-2">
                 {' '}
                 — {severityLabel(a.body.severity)}, puroks bitmap {a.body.purokBitmap.toString(2).padStart(8, '0')}
               </span>
             )}
-            {a.demoLabel && <span className="text-slate-500"> ({a.demoLabel})</span>}
+            {a.demoLabel && <span className="text-ink-3"> ({a.demoLabel})</span>}
           </li>
         ))}
       </ul>
@@ -106,9 +119,9 @@ function AlertList({ alerts, purok }: { alerts: EvaluatedAlert[]; purok: number 
 function InstructionCard({ alert }: { alert: EvaluatedAlert }) {
   const body = alert.body!
   return (
-    <div className="mb-6 rounded-lg border border-red-700 bg-red-900/60 p-4">
-      <p className="mb-1 text-xs uppercase tracking-wide text-red-300">{severityLabel(body.severity)} alert</p>
-      <p className="text-lg font-semibold">{instructionFor(body)}</p>
+    <div className="mb-6 rounded-lg border border-danger bg-danger-bg p-4">
+      <p className="mb-1 text-xs uppercase tracking-wide text-danger-deep">{severityLabel(body.severity)} alert</p>
+      <p className="font-display text-lg font-semibold text-ink">{instructionFor(body)}</p>
     </div>
   )
 }

@@ -37,8 +37,8 @@ export function HowItWorksView() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">How it works</h2>
-        <p className="mt-2 text-sm leading-relaxed text-slate-300">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3">How it works</h2>
+        <p className="mt-2 text-sm leading-relaxed text-ink-2">
           A flood warning has to travel when the internet is already gone. LIGTAS sends it as a signed 84-byte packet
           over a LoRa radio mesh — relay to relay, no towers, no signal — and every node along the way can prove the
           warning is genuine without asking anyone.
@@ -47,31 +47,31 @@ export function HowItWorksView() {
 
       <ol className="space-y-3">
         {LAYERS.map((layer) => (
-          <li key={layer.n} className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+          <li key={layer.n} className="rounded-lg border border-border bg-surface p-4">
             <div className="flex items-baseline gap-3">
-              <span className="font-mono text-xs font-bold text-sky-400">{layer.n}</span>
-              <h3 className="text-sm font-semibold text-slate-100">{layer.title}</h3>
+              <span className="font-mono text-xs font-bold text-info">{layer.n}</span>
+              <h3 className="text-sm font-semibold text-ink">{layer.title}</h3>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-slate-300">{layer.body}</p>
-            <p className="mt-2 text-xs leading-relaxed text-slate-500">{layer.proof}</p>
+            <p className="mt-2 text-sm leading-relaxed text-ink-2">{layer.body}</p>
+            <p className="mt-2 text-xs leading-relaxed text-ink-3">{layer.proof}</p>
           </li>
         ))}
       </ol>
 
-      <section className="rounded-lg border border-amber-800/60 bg-amber-950/30 p-4">
-        <h3 className="text-sm font-semibold text-amber-200">What this page actually proves</h3>
-        <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-amber-100/80">
+      <section className="rounded-lg border border-accent bg-accent-bg p-4">
+        <h3 className="text-sm font-semibold text-accent-deep">What this page actually proves</h3>
+        <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-ink-2">
           <li>
-            <strong className="text-amber-100">Real:</strong> the packet format, the Ed25519 signing, the signature
+            <strong className="text-ink">Real:</strong> the packet format, the Ed25519 signing, the signature
             check, and the replay guard. All of it runs in your browser, in the same code the hub runs.
           </li>
           <li>
-            <strong className="text-amber-100">Not real here:</strong> radio propagation. There is no LoRa mesh in a
+            <strong className="text-ink">Not real here:</strong> radio propagation. There is no LoRa mesh in a
             browser tab. The mesh is proven separately against a real Meshtasticator simulation, and no amount of
             simulation proves RF behaviour through actual terrain — that needs a field test.
           </li>
           <li>
-            <strong className="text-amber-100">Also real, but elsewhere:</strong> the Stellar anchor. A hash from the
+            <strong className="text-ink">Also real, but elsewhere:</strong> the Stellar anchor. A hash from the
             captured run is on Testnet now.
           </li>
         </ul>
@@ -79,28 +79,28 @@ export function HowItWorksView() {
           href={`https://stellar.expert/explorer/testnet/tx/${ANCHOR_TX}`}
           target="_blank"
           rel="noreferrer"
-          className="mt-3 inline-block text-xs text-amber-300 underline hover:text-amber-100"
+          className="mt-3 inline-block text-xs text-accent-deep underline hover:text-ink"
         >
           View the anchor transaction on Stellar Expert →
         </a>
       </section>
 
-      <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-        <h3 className="text-sm font-semibold text-slate-200">Try it yourself</h3>
-        <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-xs leading-relaxed text-slate-400">
+      <section className="rounded-lg border border-border bg-surface p-4">
+        <h3 className="text-sm font-semibold text-ink">Try it yourself</h3>
+        <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-xs leading-relaxed text-ink-2">
           <li>
-            Open <strong className="text-slate-200">Tester</strong> and drag the river gauge past 200 cm.
+            Open <strong className="text-ink">Tester</strong> and drag the river gauge past 200 cm.
           </li>
           <li>
-            Send a <strong className="text-slate-200">genuine</strong> alert, then switch to{' '}
-            <strong className="text-slate-200">Resident</strong>, pick purok 3 or 4, and watch the instruction appear.
+            Send a <strong className="text-ink">genuine</strong> alert, then switch to{' '}
+            <strong className="text-ink">Resident</strong>, pick purok 3 or 4, and watch the instruction appear.
           </li>
           <li>
-            Go back and send a <strong className="text-slate-200">forged</strong> one. It is a real signature — from the
+            Go back and send a <strong className="text-ink">forged</strong> one. It is a real signature — from the
             wrong key. Watch the resident view reject it without being told to.
           </li>
           <li>
-            Send a <strong className="text-slate-200">replay</strong>, or rebroadcast an old packet's exact bytes from
+            Send a <strong className="text-ink">replay</strong>, or rebroadcast an old packet's exact bytes from
             the log, and watch the sequence check catch it.
           </li>
           <li>

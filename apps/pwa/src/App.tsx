@@ -29,21 +29,36 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="min-h-screen bg-bg text-ink">
       <div className="mx-auto max-w-2xl p-4">
         <header className="mb-4">
           <div className="mb-3 flex items-baseline justify-between">
-            <h1 className="text-xl font-bold">LIGTAS</h1>
-            <span className="text-[10px] uppercase tracking-wide text-slate-500">Testnet demo</span>
+            <div className="flex items-center gap-2">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="4.5" stroke="var(--color-accent)" strokeWidth="1.8" />
+                <g stroke="var(--color-accent)" strokeWidth="1.8" strokeLinecap="round">
+                  <line x1="12" y1="1.5" x2="12" y2="4.5" />
+                  <line x1="12" y1="19.5" x2="12" y2="22.5" />
+                  <line x1="1.5" y1="12" x2="4.5" y2="12" />
+                  <line x1="19.5" y1="12" x2="22.5" y2="12" />
+                  <line x1="4.4" y1="4.4" x2="6.5" y2="6.5" />
+                  <line x1="17.5" y1="17.5" x2="19.6" y2="19.6" />
+                  <line x1="4.4" y1="19.6" x2="6.5" y2="17.5" />
+                  <line x1="17.5" y1="6.5" x2="19.6" y2="4.4" />
+                </g>
+              </svg>
+              <h1 className="font-display text-xl font-bold">Ligtas</h1>
+            </div>
+            <span className="text-[10px] uppercase tracking-wide text-ink-3">Testnet demo</span>
           </div>
-          <nav className="flex gap-1 rounded-lg bg-slate-900 p-1" aria-label="Role">
+          <nav className="flex gap-1 rounded-lg bg-surface border border-border p-1" aria-label="Role">
             {ROLES.map((r) => (
               <button
                 key={r.id}
                 onClick={() => setRole(r.id)}
                 aria-current={role === r.id}
                 className={`flex-1 rounded px-3 py-2 text-sm font-medium transition-colors ${
-                  role === r.id ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
+                  role === r.id ? 'bg-accent text-white' : 'text-ink-2 hover:text-ink'
                 }`}
               >
                 {r.label}
@@ -52,27 +67,27 @@ function App() {
           </nav>
         </header>
 
-        {sim.error && <p className="mb-4 text-sm text-red-400">Failed to load alerts: {sim.error}</p>}
+        {sim.error && <p className="mb-4 text-sm text-danger">Failed to load alerts: {sim.error}</p>}
 
         {sim.offline && role !== 'how' && (
-          <p className="mb-4 rounded border border-sky-700 bg-sky-900/40 p-2 text-xs text-sky-200">
+          <p className="mb-4 rounded border border-info bg-info-bg p-2 text-xs text-info">
             Offline — showing the last alerts this device received.
           </p>
         )}
 
         {sim.bundle?.source === 'captured' && role !== 'how' && (
-          <p className="mb-4 rounded border border-amber-700 bg-amber-900/40 p-2 text-xs text-amber-200">
+          <p className="mb-4 rounded border border-accent bg-accent-bg p-2 text-xs text-accent-deep">
             Demo data, not a live hub. {sim.bundle.captureNote}
           </p>
         )}
 
         {checkin.pendingCount > 0 && role !== 'how' && (
-          <p className="mb-4 rounded border border-sky-700 bg-sky-900/40 p-2 text-xs text-sky-200">
+          <p className="mb-4 rounded border border-info bg-info-bg p-2 text-xs text-info">
             {checkin.pendingCount} check-in{checkin.pendingCount === 1 ? '' : 's'} pending sync.
           </p>
         )}
 
-        {role === 'resident' && <ResidentView alerts={sim.evaluated} checkin={checkin} />}
+        {role === 'resident' && <ResidentView alerts={sim.evaluated} checkin={checkin} offline={sim.offline} />}
         {role === 'tester' && <TesterView sim={sim} />}
         {role === 'how' && <HowItWorksView />}
       </div>

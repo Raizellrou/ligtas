@@ -22,11 +22,11 @@ const HAZARD_OPTIONS = [
 ]
 
 const OUTCOME_STYLE: Record<EvaluatedAlert['outcome'], string> = {
-  accepted: 'border-emerald-700 bg-emerald-950/50 text-emerald-200',
-  rejected_signature: 'border-red-800 bg-red-950/50 text-red-200',
-  rejected_unknown_issuer: 'border-red-800 bg-red-950/50 text-red-200',
-  rejected_replay: 'border-amber-800 bg-amber-950/50 text-amber-200',
-  duplicate: 'border-slate-700 bg-slate-900 text-slate-300',
+  accepted: 'border-success bg-success-bg text-success',
+  rejected_signature: 'border-danger bg-danger-bg text-danger-deep',
+  rejected_unknown_issuer: 'border-danger bg-danger-bg text-danger-deep',
+  rejected_replay: 'border-accent bg-accent-bg text-accent-deep',
+  duplicate: 'border-border bg-surface text-ink-2',
 }
 
 const OUTCOME_LABEL: Record<EvaluatedAlert['outcome'], string> = {
@@ -69,17 +69,17 @@ export function TesterView({ sim }: { sim: Simulation }) {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Tester — control room</h2>
-        <p className="mt-1 text-xs text-slate-500">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-3">Tester — control room</h2>
+        <p className="mt-1 text-xs text-ink-3">
           Every packet below is really built and really signed in this browser by{' '}
-          <code className="text-slate-400">@ligtas/core</code>. Nothing tells the resident view what kind of packet it
+          <code className="text-ink-2">@ligtas/core</code>. Nothing tells the resident view what kind of packet it
           is — it decides by checking the signature and sequence itself, the same code the hub runs.
         </p>
       </div>
 
-      <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+      <section className="rounded-lg border border-border bg-surface p-4">
         <div className="mb-3 flex items-baseline justify-between">
-          <h3 className="text-sm font-semibold text-slate-200">River gauge</h3>
+          <h3 className="text-sm font-semibold text-ink">River gauge</h3>
           <TierBadge tier={tier} levelCm={riverLevelCm} />
         </div>
         <input
@@ -88,30 +88,30 @@ export function TesterView({ sim }: { sim: Simulation }) {
           max={RIVER_MAX_CM}
           value={riverLevelCm}
           onChange={(e) => setRiverLevelCm(Number(e.target.value))}
-          className="w-full accent-sky-500"
+          className="w-full accent-accent"
           aria-label="River level in centimetres"
         />
-        <div className="mt-1 flex justify-between text-[10px] text-slate-500">
+        <div className="mt-1 flex justify-between text-[10px] text-ink-3">
           <span>0 cm</span>
           <span>tier 1 · {TIER_1_CM}</span>
           <span>tier 2 · {TIER_2_CM}</span>
           <span>tier 3 · {TIER_3_CM}</span>
           <span>{RIVER_MAX_CM} cm</span>
         </div>
-        <p className="mt-2 text-xs text-slate-500">
+        <p className="mt-2 text-xs text-ink-3">
           Same thresholds the Wokwi sensor node uses (<code>apps/sensor-wokwi</code>).
         </p>
       </section>
 
-      <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-        <h3 className="mb-3 text-sm font-semibold text-slate-200">Alert contents</h3>
+      <section className="rounded-lg border border-border bg-surface p-4">
+        <h3 className="mb-3 text-sm font-semibold text-ink">Alert contents</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="block text-xs text-slate-400">
+          <label className="block text-xs text-ink-2">
             Hazard
             <select
               value={hazard}
               onChange={(e) => setHazard(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 p-2 text-sm text-slate-100"
+              className="mt-1 w-full rounded border border-border bg-bg-alt p-2 text-sm text-ink"
             >
               {HAZARD_OPTIONS.map((h) => (
                 <option key={h.value} value={h.value}>
@@ -121,23 +121,23 @@ export function TesterView({ sim }: { sim: Simulation }) {
             </select>
           </label>
 
-          <label className="block text-xs text-slate-400">
+          <label className="block text-xs text-ink-2">
             Sequence number
             <input
               type="number"
               min={0}
               value={sequence}
               onChange={(e) => setSequenceOverride(Number(e.target.value))}
-              className="mt-1 w-full rounded border border-slate-700 bg-slate-950 p-2 text-sm text-slate-100"
+              className="mt-1 w-full rounded border border-border bg-bg-alt p-2 text-sm text-ink"
             />
-            <span className="mt-1 block text-[10px] text-slate-500">
+            <span className="mt-1 block text-[10px] text-ink-3">
               Next unused is {nextSequence}. Reusing an old one is what the replay guard catches.
             </span>
           </label>
         </div>
 
         <fieldset className="mt-4">
-          <legend className="text-xs text-slate-400">Affected puroks</legend>
+          <legend className="text-xs text-ink-2">Affected puroks</legend>
           <div className="mt-2 flex flex-wrap gap-2">
             {Array.from({ length: 8 }, (_, i) => i + 1).map((p) => {
               const on = (purokBitmap & (1 << (p - 1))) !== 0
@@ -147,7 +147,7 @@ export function TesterView({ sim }: { sim: Simulation }) {
                   type="button"
                   onClick={() => setPurokBitmap(purokBitmap ^ (1 << (p - 1)))}
                   className={`h-9 w-9 rounded text-sm font-semibold ${
-                    on ? 'bg-sky-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    on ? 'bg-accent text-white' : 'bg-bg-alt text-ink-2 hover:bg-border'
                   }`}
                   aria-pressed={on}
                 >
@@ -156,48 +156,45 @@ export function TesterView({ sim }: { sim: Simulation }) {
               )
             })}
           </div>
-          <p className="mt-2 text-[10px] text-slate-500">
+          <p className="mt-2 text-[10px] text-ink-3">
             bitmap 0b{purokBitmap.toString(2).padStart(8, '0')} · a resident only sees an instruction if their purok bit
             is set
           </p>
         </fieldset>
       </section>
 
-      <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-        <h3 className="mb-1 text-sm font-semibold text-slate-200">Broadcast</h3>
-        <p className="mb-3 text-xs text-slate-500">
+      <section className="rounded-lg border border-border bg-surface p-4">
+        <h3 className="mb-1 text-sm font-semibold text-ink">Broadcast</h3>
+        <p className="mb-3 text-xs text-ink-3">
           Severity is taken from the gauge{tier === 0 ? ' (below tier 1 — sending as tier 1)' : ''}.
         </p>
         <div className="grid gap-2 sm:grid-cols-2">
           <BroadcastButton
             onClick={() => send('genuine')}
-            className="border-emerald-700 bg-emerald-900/40 hover:bg-emerald-900/70"
+            className="border-success bg-success-bg hover:bg-success-bg/70"
             title="Genuine alert"
             subtitle="Signed by this browser's authorised issuer key"
           />
           <BroadcastButton
             onClick={() => send('forged')}
-            className="border-red-800 bg-red-900/30 hover:bg-red-900/60"
+            className="border-danger bg-danger-bg hover:bg-danger-bg/70"
             title="Forged alert"
             subtitle="Really signed — by an impostor keypair the verifier doesn't trust"
           />
           <BroadcastButton
             onClick={() => send('tampered')}
-            className="border-red-800 bg-red-900/30 hover:bg-red-900/60"
+            className="border-danger bg-danger-bg hover:bg-danger-bg/70"
             title="Tampered alert"
             subtitle="Signed correctly, then one body byte flipped afterwards"
           />
           <BroadcastButton
             onClick={() => send('replay-sequence')}
-            className="border-amber-800 bg-amber-900/30 hover:bg-amber-900/60"
+            className="border-accent bg-accent-bg hover:bg-accent-bg/70"
             title="Replay (old sequence)"
             subtitle="A fresh, correctly signed packet reusing sequence 1"
           />
         </div>
-        <button
-          onClick={sim.reset}
-          className="mt-3 text-xs text-slate-400 underline hover:text-slate-200"
-        >
+        <button onClick={sim.reset} className="mt-3 text-xs text-ink-2 underline hover:text-ink">
           Reset — drop everything broadcast here, back to the captured run
         </button>
       </section>
@@ -205,11 +202,11 @@ export function TesterView({ sim }: { sim: Simulation }) {
       {latest && <Pipeline latest={latest} />}
 
       <section>
-        <h3 className="mb-2 text-sm font-semibold text-slate-200">
-          Transmission log <span className="font-normal text-slate-500">({testerAlerts.length} sent from here)</span>
+        <h3 className="mb-2 text-sm font-semibold text-ink">
+          Transmission log <span className="font-normal text-ink-3">({testerAlerts.length} sent from here)</span>
         </h3>
         {testerAlerts.length === 0 ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-3">
             Nothing broadcast yet. The resident view is currently showing the {sim.capturedCount} packets captured from
             the real mesh-sim run.
           </p>
@@ -249,7 +246,7 @@ export function TesterView({ sim }: { sim: Simulation }) {
         )}
       </section>
 
-      <p className="text-[10px] leading-relaxed text-slate-500">
+      <p className="text-[10px] leading-relaxed text-ink-3">
         Issuer key for this browser: <code className="break-all">{sim.testerPublicKey}</code> (index{' '}
         {TESTER_ISSUER_INDEX}, generated locally, holds no funds).
       </p>
@@ -272,8 +269,8 @@ function BroadcastButton({
 }) {
   return (
     <button onClick={onClick} className={`rounded border p-3 text-left transition-colors ${className}`}>
-      <span className="block text-sm font-semibold text-slate-100">{title}</span>
-      <span className="mt-0.5 block text-[11px] text-slate-400">{subtitle}</span>
+      <span className="block text-sm font-semibold text-ink">{title}</span>
+      <span className="mt-0.5 block text-[11px] text-ink-2">{subtitle}</span>
     </button>
   )
 }
@@ -281,12 +278,12 @@ function BroadcastButton({
 function TierBadge({ tier, levelCm }: { tier: number; levelCm: number }) {
   const style =
     tier === 0
-      ? 'bg-slate-800 text-slate-400'
+      ? 'bg-bg-alt text-ink-2'
       : tier === 1
-        ? 'bg-yellow-900/60 text-yellow-200'
+        ? 'bg-accent-bg text-accent-deep'
         : tier === 2
-          ? 'bg-orange-900/60 text-orange-200'
-          : 'bg-red-900/70 text-red-100'
+          ? 'bg-accent text-white'
+          : 'bg-danger text-white'
   return (
     <span className={`rounded px-2 py-1 text-xs font-semibold ${style}`}>
       {levelCm} cm · {tier === 0 ? 'below threshold' : `tier ${tier}`}
@@ -304,8 +301,8 @@ function Pipeline({ latest }: { latest: EvaluatedAlert }) {
   const replayOk = latest.outcome === 'accepted'
 
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-      <h3 className="mb-3 text-sm font-semibold text-slate-200">What happened to that packet</h3>
+    <section className="rounded-lg border border-border bg-surface p-4">
+      <h3 className="mb-3 text-sm font-semibold text-ink">What happened to that packet</h3>
       <ol className="space-y-2 text-xs">
         <Stage state="pass" label="Sensor built and signed the packet" detail="real Ed25519, 84 bytes on the wire" />
         <Stage
@@ -343,14 +340,13 @@ function Pipeline({ latest }: { latest: EvaluatedAlert }) {
 
 function Stage({ state, label, detail }: { state: 'pass' | 'fail' | 'skipped'; label: string; detail: string }) {
   const mark = state === 'pass' ? '✓' : state === 'fail' ? '✕' : '–'
-  const color =
-    state === 'pass' ? 'text-emerald-400' : state === 'fail' ? 'text-red-400' : 'text-slate-600'
+  const color = state === 'pass' ? 'text-success' : state === 'fail' ? 'text-danger' : 'text-ink-3'
   return (
     <li className="flex gap-3">
       <span className={`font-mono font-bold ${color}`}>{mark}</span>
       <span>
-        <span className={state === 'skipped' ? 'text-slate-500' : 'text-slate-200'}>{label}</span>
-        <span className="block text-[11px] text-slate-500">{detail}</span>
+        <span className={state === 'skipped' ? 'text-ink-3' : 'text-ink'}>{label}</span>
+        <span className="block text-[11px] text-ink-3">{detail}</span>
       </span>
     </li>
   )

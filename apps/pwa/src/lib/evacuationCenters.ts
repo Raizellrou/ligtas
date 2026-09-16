@@ -89,3 +89,14 @@ export function formatDistance(meters: number): string {
   const km = meters / 1000
   return `${Number.isInteger(km) ? km : km.toFixed(1)} km`
 }
+
+// Rough, deliberately conservative walking pace (~80m/min, roughly 4.8km/h)
+// so the number stays usable for people who won't be walking briskly during
+// an evacuation -- a raw meter count is hard for most people to judge at a
+// glance, a minute count isn't.
+const METERS_PER_MINUTE = 80
+
+export function formatWalkTime(meters: number): string {
+  const minutes = Math.max(1, Math.round(meters / METERS_PER_MINUTE))
+  return `~${minutes} min walk`
+}

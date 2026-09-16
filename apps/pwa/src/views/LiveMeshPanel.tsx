@@ -144,15 +144,15 @@ export function LiveMeshPanel() {
   const running = job?.status === 'running'
 
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-      <h3 className="mb-1 text-sm font-semibold text-slate-200">Live mesh demo</h3>
-      <p className="mb-3 text-xs text-slate-500">
-        Runs the real Docker-simulated LoRa mesh via <code className="text-slate-400">packages/mesh-sim</code>, not
+    <section className="rounded-lg border border-border bg-surface p-4">
+      <h3 className="mb-1 text-sm font-semibold text-ink">Live mesh demo</h3>
+      <p className="mb-3 text-xs text-ink-3">
+        Runs the real Docker-simulated LoRa mesh via <code className="text-ink-2">packages/mesh-sim</code>, not
         signed in this browser like the broadcasts above.
       </p>
 
       {!caps.available ? (
-        <ul className="space-y-1 text-xs text-amber-300">
+        <ul className="space-y-1 text-xs text-accent-deep">
           {caps.reasons.map((r) => (
             <li key={r}>· {r}</li>
           ))}
@@ -164,10 +164,10 @@ export function LiveMeshPanel() {
               type="button"
               onClick={() => run('bridge')}
               disabled={running}
-              className="rounded border border-emerald-700 bg-emerald-900/40 p-3 text-left text-sm font-semibold text-slate-100 hover:bg-emerald-900/70 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded border border-success bg-success-bg p-3 text-left text-sm font-semibold text-ink hover:bg-success-bg/70 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {SCRIPT_LABEL.bridge}
-              <span className="mt-0.5 block text-[11px] font-normal text-slate-400">
+              <span className="mt-0.5 block text-[11px] font-normal text-ink-2">
                 Real mesh, real hub, real accepted/forged/replayed alerts
               </span>
             </button>
@@ -175,10 +175,10 @@ export function LiveMeshPanel() {
               type="button"
               onClick={() => run('relay-proof')}
               disabled={running}
-              className="rounded border border-sky-700 bg-sky-900/40 p-3 text-left text-sm font-semibold text-slate-100 hover:bg-sky-900/70 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded border border-info bg-info-bg p-3 text-left text-sm font-semibold text-ink hover:bg-info-bg/70 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {SCRIPT_LABEL['relay-proof']}
-              <span className="mt-0.5 block text-[11px] font-normal text-slate-400">
+              <span className="mt-0.5 block text-[11px] font-normal text-ink-2">
                 Multi-hop delivery, a relay killed mid-run, forged/replay rejection
               </span>
             </button>
@@ -186,15 +186,15 @@ export function LiveMeshPanel() {
 
           {job && (
             <div className="mt-4 space-y-3">
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-ink-2">
                 {SCRIPT_LABEL[job.script]} — <span className="font-mono">{job.status}</span>
               </p>
               {job.lines.length > 0 && (
-                <pre className="max-h-56 overflow-auto rounded bg-slate-950 p-2 text-[10px] text-slate-400">
+                <pre className="max-h-56 overflow-auto rounded bg-bg-alt p-2 text-[10px] text-ink-2">
                   {job.lines.join('\n')}
                 </pre>
               )}
-              {job.error && <p className="text-xs text-red-400">{job.error}</p>}
+              {job.error && <p className="text-xs text-danger">{job.error}</p>}
               {job.summary?.kind === 'relay-proof' && <RelayProofResult summary={job.summary} />}
               {job.summary?.kind === 'bridge' && <BridgeResult bundle={job.summary.bundle} />}
             </div>
@@ -208,12 +208,12 @@ export function LiveMeshPanel() {
 function RelayProofResult({ summary }: { summary: RelayProofSummary }) {
   return (
     <div>
-      <p className="mb-2 text-xs font-semibold text-slate-300">
+      <p className="mb-2 text-xs font-semibold text-ink-2">
         {summary.passed}/{summary.total} checks passed
       </p>
       <ul className="space-y-1 text-xs">
         {summary.checks.map((c) => (
-          <li key={c.name} className={c.passed ? 'text-emerald-400' : 'text-red-400'}>
+          <li key={c.name} className={c.passed ? 'text-success' : 'text-danger'}>
             {c.passed ? '✓' : '✕'} {c.name}
           </li>
         ))}
@@ -233,7 +233,7 @@ function BridgeResult({ bundle }: { bundle: AlertBundle }) {
   return (
     <ul className="space-y-1 text-xs">
       {evaluated.map((a) => (
-        <li key={a.index} className="text-slate-300">
+        <li key={a.index} className="text-ink-2">
           <span className="font-mono">{a.outcome}</span> — {a.demoLabel ?? `seq ${a.body?.sequence ?? '?'}`}
         </li>
       ))}
