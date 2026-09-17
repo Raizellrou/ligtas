@@ -4,6 +4,7 @@ import { useHouseholdCheckin } from './lib/useHouseholdCheckin'
 import { ResidentView } from './views/ResidentView'
 import { TesterView } from './views/TesterView'
 import { HowItWorksView } from './views/HowItWorksView'
+import { SplashScreen } from './views/SplashScreen'
 
 type Role = 'resident' | 'tester' | 'how'
 
@@ -23,6 +24,7 @@ function App() {
     const stored = localStorage.getItem(ROLE_STORAGE_KEY)
     return stored === 'tester' || stored === 'how' ? stored : 'resident'
   })
+  const [showSplash, setShowSplash] = useState(true)
   const sim = useSimulation()
   const checkin = useHouseholdCheckin()
 
@@ -30,6 +32,8 @@ function App() {
     localStorage.setItem(ROLE_STORAGE_KEY, next)
     setRoleState(next)
   }
+
+  if (showSplash) return <SplashScreen onContinue={() => setShowSplash(false)} />
 
   return (
     <div className="min-h-screen bg-bg text-ink">
