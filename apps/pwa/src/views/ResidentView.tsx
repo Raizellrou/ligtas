@@ -3,6 +3,7 @@ import { latestRelevantAlert, type EvaluatedAlert } from '../lib/evaluateBundle'
 import { instructionFor, severityLabel } from '../lib/instructions'
 import { usePersistedPurok } from '../usePersistedPurok'
 import type { UseHouseholdCheckin } from '../lib/useHouseholdCheckin'
+import { useReliefBalance } from '../lib/useReliefBalance'
 import { HouseholdCheckin } from './HouseholdCheckin'
 import { EvacuationMap } from './EvacuationMap'
 
@@ -36,9 +37,17 @@ export function ResidentView({
   offline: boolean
 }) {
   const { purok, setPurok, clearPurok } = usePersistedPurok()
+  // Relief only ever shows once this purok actually has a live alert
+  // against it -- a household's address can hold an old/unrelated
+  // claimable balance (e.g. from a past drill), and showing that here
+  // would read as "you got relief" for an event that isn't happening.
+  const relief = useReliefBalance(checkin.stellarAddress)
 
   if (purok === null) return <PurokPicker onSelect={setPurok} />
   if (!checkin.joined) return <JoinStep purok={purok} join={checkin.join} onBack={clearPurok} />
+
+  const affected = alerts !== null && latestRelevantAlert(alerts, purok) !== undefined
+  const showRelief = affected && relief !== null
 
   return (
     <>
@@ -49,6 +58,18 @@ export function ResidentView({
             <span className={`h-1.5 w-1.5 rounded-full ${offline ? 'bg-ink-3' : 'bg-info'}`} />
             Purok {purok} · {offline ? 'offline' : 'online'}
           </span>
+          {showRelief && (
+            <a
+              href={`https://stellar.expert/explorer/testnet/claimable-balance/${relief!.id}`}
+              target="_blank"
+              rel="noreferrer"
+              title="View proof on Stellar Expert"
+              className="flex items-center gap-1.5 rounded-full border border-success bg-success-bg px-3 py-1 text-xs font-medium text-success hover:bg-success-bg/70"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />
+              {relief!.amountXlm} XLM
+            </a>
+          )}
           <button onClick={clearPurok} className="text-sm text-ink-2 underline">
             change
           </button>

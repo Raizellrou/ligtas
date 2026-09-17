@@ -1,5 +1,4 @@
 import type { UseHouseholdCheckin } from '../lib/useHouseholdCheckin'
-import { useReliefBalance } from '../lib/useReliefBalance'
 
 const STATUS_LABEL: Record<'safe' | 'need_help', string> = {
   safe: 'Safe',
@@ -29,35 +28,7 @@ function HelpIcon() {
 }
 
 export function HouseholdCheckin(props: UseHouseholdCheckin) {
-  return (
-    <>
-      <ReliefBanner stellarAddress={props.stellarAddress} />
-      <StatusPanel {...props} />
-    </>
-  )
-}
-
-// Checks Stellar Testnet's own public ledger for a real claimable balance --
-// proof a payout actually happened, independently checkable on Stellar
-// Expert, not just this app's word for it. Renders nothing until one exists.
-function ReliefBanner({ stellarAddress }: { stellarAddress: string | null }) {
-  const balance = useReliefBalance(stellarAddress)
-  if (!balance) return null
-
-  return (
-    <div className="mb-4 rounded-lg border border-success bg-success-bg p-4">
-      <p className="text-xs uppercase tracking-wide text-success">Relief received</p>
-      <p className="font-display text-lg font-semibold text-ink">{balance.amountXlm} XLM</p>
-      <a
-        href={`https://stellar.expert/explorer/testnet/claimable-balance/${balance.id}`}
-        target="_blank"
-        rel="noreferrer"
-        className="mt-1 inline-block text-xs text-success underline"
-      >
-        View proof on Stellar Expert
-      </a>
-    </div>
-  )
+  return <StatusPanel {...props} />
 }
 
 function StatusPanel({ displayName, roster, pendingCount, submit, leave }: UseHouseholdCheckin) {
