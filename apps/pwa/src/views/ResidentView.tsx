@@ -29,10 +29,12 @@ const JOIN_CODE_OPTIONS: { purok: number; code: string }[] = [
 
 export function ResidentView({
   alerts,
+  capturedCount,
   checkin,
   offline,
 }: {
   alerts: EvaluatedAlert[] | null
+  capturedCount: number
   checkin: UseHouseholdCheckin
   offline: boolean
 }) {
@@ -46,7 +48,12 @@ export function ResidentView({
   if (purok === null) return <PurokPicker onSelect={setPurok} />
   if (!checkin.joined) return <JoinStep purok={purok} join={checkin.join} onBack={clearPurok} />
 
-  const affected = alerts !== null && latestRelevantAlert(alerts, purok) !== undefined
+  // Only alerts actually broadcast live this session count toward relief --
+  // the leading captured entries are a historical demo recording (Sep
+  // 2026), and a household's real balance from that real past run
+  // shouldn't read as "relief happening right now" on a fresh page load.
+  const liveAlerts = alerts?.filter((a) => a.index >= capturedCount) ?? null
+  const affected = liveAlerts !== null && latestRelevantAlert(liveAlerts, purok) !== undefined
   const showRelief = affected && relief !== null
 
   return (

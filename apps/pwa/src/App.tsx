@@ -90,7 +90,14 @@ function App() {
           </p>
         )}
 
-        {role === 'resident' && <ResidentView alerts={sim.evaluated} checkin={checkin} offline={sim.offline} />}
+        {role === 'resident' && (
+          <ResidentView
+            alerts={sim.evaluated}
+            capturedCount={sim.capturedCount}
+            checkin={checkin}
+            offline={sim.offline}
+          />
+        )}
         {role === 'tester' && <TesterView sim={sim} />}
         {role === 'how' && <HowItWorksView />}
 
