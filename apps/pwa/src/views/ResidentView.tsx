@@ -65,7 +65,7 @@ export function ResidentView({
             <span className={`h-1.5 w-1.5 rounded-full ${offline ? 'bg-ink-3' : 'bg-info'}`} />
             Purok {purok} · {offline ? 'offline' : 'online'}
           </span>
-          {showRelief && (
+          {showRelief ? (
             <a
               href={`https://stellar.expert/explorer/testnet/claimable-balance/${relief!.id}`}
               target="_blank"
@@ -76,6 +76,10 @@ export function ResidentView({
               <span className="h-1.5 w-1.5 rounded-full bg-success" />
               {relief!.amountXlm} XLM
             </a>
+          ) : (
+            <span className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium text-ink-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-ink-3" />0 XLM
+            </span>
           )}
           <button onClick={clearPurok} className="text-sm text-ink-2 underline">
             change
