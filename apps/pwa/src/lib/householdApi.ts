@@ -20,12 +20,16 @@ export async function resolveJoinCode(joinCode: string): Promise<{ householdId: 
   }
 }
 
-export async function fetchHouseholdStatus(householdId: string): Promise<MemberCheckin[] | Unreachable> {
+export interface HouseholdStatus {
+  members: MemberCheckin[]
+  stellarAddress: string | undefined
+}
+
+export async function fetchHouseholdStatus(householdId: string): Promise<HouseholdStatus | Unreachable> {
   try {
     const res = await fetch(`${HUB_URL}/household/${encodeURIComponent(householdId)}/status`)
     if (!res.ok) return 'unreachable'
-    const data = (await res.json()) as { members: MemberCheckin[] }
-    return data.members
+    return (await res.json()) as HouseholdStatus
   } catch {
     return 'unreachable'
   }

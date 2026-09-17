@@ -1,6 +1,6 @@
 import { Router } from "express";
 import type Database from "better-sqlite3";
-import { findHouseholdByJoinCode, householdExists } from "./households.js";
+import { findHouseholdByJoinCode, householdExists, householdStellarAddress } from "./households.js";
 import { getRoster, isCheckinStatus, normalizeDisplayName, submitCheckin } from "./checkins.js";
 
 /**
@@ -50,7 +50,11 @@ export function createHouseholdRouter(db: Database.Database, pwaOrigin: string):
       res.status(404).json({ error: "unknown household" });
       return;
     }
-    res.json({ householdId, members: getRoster(db, householdId) });
+    res.json({
+      householdId,
+      members: getRoster(db, householdId),
+      stellarAddress: householdStellarAddress(db, householdId),
+    });
   });
 
   router.post("/:householdId/checkin", (req, res) => {

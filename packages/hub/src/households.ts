@@ -58,6 +58,19 @@ export function householdExists(db: Database.Database, householdId: string): boo
 }
 
 /**
+ * The Stellar address funds land on for this household -- public
+ * information (it's just an address, no secret), returned to the PWA so a
+ * resident can look up their own claimable balance directly against
+ * Horizon's public API. Returns undefined for an unknown household.
+ */
+export function householdStellarAddress(db: Database.Database, householdId: string): string | undefined {
+  const row = db.prepare<[string], { stellarAddress: string }>(
+    "SELECT stellar_address AS stellarAddress FROM households WHERE household_id = ?",
+  ).get(householdId);
+  return row?.stellarAddress;
+}
+
+/**
  * Households whose purok bit is set in an alert's purokBitmap. Mirrors
  * apps/pwa/src/lib/instructions.ts's purokBitSet (bit n set = purok n+1
  * affected, per the packet spec, LIGTAS-PRD.md Section 5.1) -- duplicated

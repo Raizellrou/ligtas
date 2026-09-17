@@ -64,7 +64,7 @@ describe("GET /household/:householdId/status", () => {
   it("returns an empty roster for a household with no check-ins yet", async () => {
     const res = await fetch(`${baseUrl}/household/hh-001/status`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ householdId: "hh-001", members: [] });
+    expect(await res.json()).toEqual({ householdId: "hh-001", members: [], stellarAddress: "GDUMMY" });
   });
 
   it("404s on an unknown household id", async () => {

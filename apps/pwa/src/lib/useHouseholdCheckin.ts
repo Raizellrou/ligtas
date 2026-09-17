@@ -19,6 +19,7 @@ export interface UseHouseholdCheckin {
   join(joinCode: string, displayName: string): Promise<'ok' | 'not_found' | 'unreachable'>
   leave(): void
   roster: MemberCheckin[] | null
+  stellarAddress: string | null
   pendingCount: number
   offline: boolean
   submit(status: CheckinStatus): void
@@ -27,6 +28,7 @@ export interface UseHouseholdCheckin {
 export function useHouseholdCheckin(): UseHouseholdCheckin {
   const { householdId, displayName, setIdentity, clearIdentity } = useHouseholdIdentity()
   const [roster, setRoster] = useState<MemberCheckin[] | null>(null)
+  const [stellarAddress, setStellarAddress] = useState<string | null>(null)
   const [pendingCount, setPendingCount] = useState(0)
   const [offline, setOffline] = useState(false)
 
@@ -48,7 +50,8 @@ export function useHouseholdCheckin(): UseHouseholdCheckin {
     if (result === 'unreachable') {
       setOffline(true)
     } else {
-      setRoster(result)
+      setRoster(result.members)
+      setStellarAddress(result.stellarAddress ?? null)
       setOffline(false)
     }
   }, [])
@@ -88,6 +91,7 @@ export function useHouseholdCheckin(): UseHouseholdCheckin {
   function leave() {
     clearIdentity()
     setRoster(null)
+    setStellarAddress(null)
     setPendingCount(0)
     setOffline(false)
   }
@@ -110,6 +114,7 @@ export function useHouseholdCheckin(): UseHouseholdCheckin {
     join,
     leave,
     roster,
+    stellarAddress,
     pendingCount,
     offline,
     submit,
