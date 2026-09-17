@@ -1,20 +1,74 @@
 [
   {
+    "householdId": "hh-p01",
+    "purok": 1,
+    "stellarAddress": "GCKVWRQJLFNHCQJBDHCAZNSOL6V3NO2MY3YRSVUNZWJL53UHEF3NLGZK",
+    "joinCode": "ORG-529"
+  },
+  {
+    "householdId": "hh-p02",
+    "purok": 2,
+    "stellarAddress": "GCWUNRS2QPV62ZK2KBMMOYXXHJ72234AWWMGHLRZJI6AHWVAEK4RLIMC",
+    "joinCode": "YLW-777"
+  },
+  {
     "householdId": "hh-001",
     "purok": 3,
     "stellarAddress": "GAIXEQPJKEN5N4PJLA54DCE7FQJMP6SNCKSC4P6SB4AQZLLZVFOCRNIE",
     "joinCode": "BLU-482"
   },
   {
-    "householdId": "hh-002",
-    "purok": 3,
-    "stellarAddress": "GCLB2B6L2TKWZKGYONAJNI7AW2X3QXCD24X3XZU2ZPNUKU4RTIBP3ZXR",
-    "joinCode": "GRN-113"
-  },
-  {
     "householdId": "hh-003",
     "purok": 4,
     "stellarAddress": "GCMTOHW2UWYZRAWY3LVJGZF7E32RNOUPEE37ZGPAXDRNUMPGH3WIQAGJ",
     "joinCode": "AMB-207"
+  },
+  {
+    "householdId": "hh-p05",
+    "purok": 5,
+    "stellarAddress": "GCIWV3JSPDKOJ6VAIZIPDPRDOFBDVTQY76Q3FNYUUMYXDW4TDSQLJNXW",
+    "joinCode": "PRP-419"
+  },
+  {
+    "householdId": "hh-p06",
+    "purok": 6,
+    "stellarAddress": "GDHNNZQ4XQE65ADB5AGPDFN2TMF5QB6U4MVGHJ4CF62TBJZNZQRXEUY2",
+    "joinCode": "TEA-874"
+  },
+  {
+    "householdId": "hh-p07",
+    "purok": 7,
+    "stellarAddress": "GA7VW7LMNJ2EIQ3WTPBKS6ZP62CQSPBJ6ZTGXRC4PT4H6FIGPRXCMGMW",
+    "joinCode": "CRM-520"
+  },
+  {
+    "householdId": "hh-p08",
+    "purok": 8,
+    "stellarAddress": "GBCWR37MDTCLKZV4FX2ILX7WBHN6LXRJWQNVG6BOPP6HIUG66YYCSWG4",
+    "joinCode": "SLV-126"
+  },
+  {
+    "householdId": "hh-p09",
+    "purok": 9,
+    "stellarAddress": "GCBNG23BNWB7JSA25BQ54XQ53CAWBFOOHCQOQXAKX6BVLVNFYZGBIROH",
+    "joinCode": "GLD-638"
+  },
+  {
+    "householdId": "hh-p10",
+    "purok": 10,
+    "stellarAddress": "GCGHOT66MNYNHOIN5JYNEEEO76G44XPPHTN7YW6QZRMYLFJQCKBGFT44",
+    "joinCode": "MRN-605"
+  },
+  {
+    "householdId": "hh-p11",
+    "purok": 11,
+    "stellarAddress": "GBJWZUE7XIYAVU7KTI5RIVDGKKQPIRRF5CVFH4UXU76N2WWHI2ZSQCT6",
+    "joinCode": "CYN-801"
+  },
+  {
+    "householdId": "hh-p12",
+    "purok": 12,
+    "stellarAddress": "GBC5VJA7REMLMOL6FIOWQF46KRFGUT72L7WWHGQKYU43MQIW7XUVW46M",
+    "joinCode": "RSE-577"
   }
 ]

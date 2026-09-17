@@ -42,6 +42,7 @@ export function TesterView({ sim }: { sim: Simulation }) {
   const [hazard, setHazard] = useState<number>(defaultBroadcastOptions().hazard)
   const [purokBitmap, setPurokBitmap] = useState(defaultBroadcastOptions().purokBitmap)
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [showFullLog, setShowFullLog] = useState(false)
 
   const tier = tierForLevel(riverLevelCm)
 
@@ -241,6 +242,37 @@ export function TesterView({ sim }: { sim: Simulation }) {
                     {sim.bundle?.alerts[a.index]?.packetHex}
                   </p>
                 )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section>
+        <button
+          onClick={() => setShowFullLog((v) => !v)}
+          className="text-xs text-ink-3 underline hover:text-ink-2"
+        >
+          {showFullLog ? 'Hide' : 'Show'} full verification log — every packet, including the captured demo run (
+          {(sim.evaluated ?? []).length})
+        </button>
+        {showFullLog && (
+          <ul className="mt-2 space-y-1">
+            {(sim.evaluated ?? []).map((a) => (
+              <li
+                key={a.index}
+                className={`rounded border p-2 text-xs ${
+                  a.outcome === 'accepted' ? 'border-success bg-success-bg' : 'border-border bg-surface'
+                }`}
+              >
+                <span className="font-mono">{OUTCOME_LABEL[a.outcome]}</span>
+                {a.body && (
+                  <span className="text-ink-2">
+                    {' '}
+                    — {severityLabel(a.body.severity)}, puroks bitmap {a.body.purokBitmap.toString(2).padStart(8, '0')}
+                  </span>
+                )}
+                {a.demoLabel && <span className="text-ink-3"> ({a.demoLabel})</span>}
               </li>
             ))}
           </ul>

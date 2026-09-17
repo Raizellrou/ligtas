@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
 import { latestRelevantAlert, type EvaluatedAlert } from '../lib/evaluateBundle'
 import { instructionFor, severityLabel } from '../lib/instructions'
 import { usePersistedPurok } from '../usePersistedPurok'
@@ -6,13 +6,25 @@ import type { UseHouseholdCheckin } from '../lib/useHouseholdCheckin'
 import { HouseholdCheckin } from './HouseholdCheckin'
 import { EvacuationMap } from './EvacuationMap'
 
-const OUTCOME_LABEL: Record<EvaluatedAlert['outcome'], string> = {
-  accepted: 'Verified',
-  rejected_signature: 'Rejected — bad signature',
-  rejected_unknown_issuer: 'Rejected — unknown issuer',
-  rejected_replay: 'Rejected — replay',
-  duplicate: 'Duplicate (already seen)',
-}
+// Mirrors packages/hub/config/households.json's seed data -- one test join
+// code per purok, so onboarding can offer a dropdown instead of asking
+// residents to type a code from memory. Demo/testing convenience only; a
+// real deployment would still have residents get their code from whoever
+// registered their household, same as JoinHouseholdForm always required.
+const JOIN_CODE_OPTIONS: { purok: number; code: string }[] = [
+  { purok: 1, code: 'ORG-529' },
+  { purok: 2, code: 'YLW-777' },
+  { purok: 3, code: 'BLU-482' },
+  { purok: 4, code: 'AMB-207' },
+  { purok: 5, code: 'PRP-419' },
+  { purok: 6, code: 'TEA-874' },
+  { purok: 7, code: 'CRM-520' },
+  { purok: 8, code: 'SLV-126' },
+  { purok: 9, code: 'GLD-638' },
+  { purok: 10, code: 'MRN-605' },
+  { purok: 11, code: 'CYN-801' },
+  { purok: 12, code: 'RSE-577' },
+]
 
 export function ResidentView({
   alerts,
@@ -26,6 +38,7 @@ export function ResidentView({
   const { purok, setPurok, clearPurok } = usePersistedPurok()
 
   if (purok === null) return <PurokPicker onSelect={setPurok} />
+  if (!checkin.joined) return <JoinStep purok={purok} join={checkin.join} onBack={clearPurok} />
 
   return (
     <>
@@ -118,51 +131,80 @@ function PurokPicker({ onSelect }: { onSelect: (p: number) => void }) {
   )
 }
 
+function JoinStep({
+  purok,
+  join,
+  onBack,
+}: {
+  purok: number
+  join: UseHouseholdCheckin['join']
+  onBack: () => void
+}) {
+  const joinCode = JOIN_CODE_OPTIONS.find((o) => o.purok === purok)?.code ?? JOIN_CODE_OPTIONS[0]!.code
+  const [name, setName] = useState('')
+  const [status, setStatus] = useState<'idle' | 'joining' | 'not_found' | 'unreachable'>('idle')
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setStatus('joining')
+    const result = await join(joinCode, name.trim())
+    if (result !== 'ok') setStatus(result)
+  }
+
+  return (
+    <div className="mx-auto max-w-sm">
+      <p className="mb-1 text-sm font-semibold text-ink">Purok {purok} · join your household</p>
+      <p className="mb-4 text-xs text-ink-3">Type your name so your family can see your status.</p>
+
+      <form onSubmit={handleSubmit}>
+        <label className="mb-1 block text-xs font-medium text-ink-2">Household join code</label>
+        <p className="mb-3 rounded border border-border bg-bg-alt px-2 py-1.5 text-sm font-mono text-ink-2">
+          {joinCode}
+        </p>
+
+        <label className="mb-1 block text-xs font-medium text-ink-2">Your username</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Bob"
+          className="mb-3 w-full rounded border border-border bg-bg-alt px-2 py-1.5 text-sm text-ink placeholder:text-ink-3"
+        />
+
+        <button
+          type="submit"
+          disabled={!name.trim() || status === 'joining'}
+          className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-deep disabled:cursor-not-allowed disabled:bg-bg-alt disabled:text-ink-3"
+        >
+          {status === 'joining' ? 'Joining…' : 'Continue'}
+        </button>
+      </form>
+
+      {status === 'not_found' && <p className="mt-2 text-xs text-danger">That join code wasn't recognized.</p>}
+      {status === 'unreachable' && (
+        <p className="mt-2 text-xs text-accent-deep">Can't reach the hub right now — try again once connected.</p>
+      )}
+
+      <button onClick={onBack} className="mt-3 w-full text-center text-xs text-ink-3 underline hover:text-ink-2">
+        Back to purok selection
+      </button>
+    </div>
+  )
+}
+
 function AlertList({ alerts, purok }: { alerts: EvaluatedAlert[]; purok: number }) {
-  const [showLog, setShowLog] = useState(false)
   const accepted = alerts.filter((a) => a.outcome === 'accepted' && a.body)
   const latest = latestRelevantAlert(alerts, purok)
 
-  return (
-    <>
-      {latest ? (
-        <InstructionCard alert={latest} />
-      ) : accepted.length > 0 ? (
-        <div className="mb-6 rounded border border-border bg-surface p-4">
-          <p className="text-ink-2">Your purok is not affected by any current alert.</p>
-        </div>
-      ) : (
-        <div className="mb-6 rounded border border-border bg-surface p-4">
-          <p className="text-ink-2">No alerts.</p>
-        </div>
-      )}
-
-      <button onClick={() => setShowLog((v) => !v)} className="mb-2 text-xs text-ink-3 underline hover:text-ink-2">
-        {showLog ? 'Hide' : 'Show'} verification details ({alerts.length})
-      </button>
-
-      {showLog && (
-        <ul className="space-y-1">
-          {alerts.map((a) => (
-            <li
-              key={a.index}
-              className={`rounded border p-2 text-xs ${
-                a.outcome === 'accepted' ? 'border-success bg-success-bg' : 'border-border bg-surface'
-              }`}
-            >
-              <span className="font-mono">{OUTCOME_LABEL[a.outcome]}</span>
-              {a.body && (
-                <span className="text-ink-2">
-                  {' '}
-                  — {severityLabel(a.body.severity)}, puroks bitmap {a.body.purokBitmap.toString(2).padStart(8, '0')}
-                </span>
-              )}
-              {a.demoLabel && <span className="text-ink-3"> ({a.demoLabel})</span>}
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+  return latest ? (
+    <InstructionCard alert={latest} />
+  ) : accepted.length > 0 ? (
+    <div className="mb-6 rounded border border-border bg-surface p-4">
+      <p className="text-ink-2">Your purok is not affected by any current alert.</p>
+    </div>
+  ) : (
+    <div className="mb-6 rounded border border-border bg-surface p-4">
+      <p className="text-ink-2">No alerts.</p>
+    </div>
   )
 }
 
