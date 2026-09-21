@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Hazard } from '@ligtas/core'
-import type { EvaluatedAlert } from '../lib/evaluateBundle'
+import { latestRelevantAlert, type EvaluatedAlert } from '../lib/evaluateBundle'
 import { severityLabel } from '../lib/instructions'
+import { planWalkPath } from '../lib/roadGraph'
+import type { LiveLocation } from '../lib/useLiveLocation'
 import type { Simulation } from '../lib/useSimulation'
+import { usePersistedPurok } from '../usePersistedPurok'
 import {
   RIVER_MAX_CM,
   TESTER_ISSUER_INDEX,
@@ -37,7 +40,106 @@ const OUTCOME_LABEL: Record<EvaluatedAlert['outcome'], string> = {
   duplicate: 'DUPLICATE — already seen',
 }
 
-export function TesterView({ sim }: { sim: Simulation }) {
+const WALK_SPEEDS = [5, 10, 20]
+
+// Stands in for the phone's GPS (the Resident view can't be walked around
+// Nangka in a demo): a fake position walks the resident's route from their
+// purok to the nearest evacuation center, feeding the very same location
+// pipeline real GPS does. Raising the river gauge mid-walk re-plans the route
+// from wherever the walker is.
+function WalkSimulator({ liveLocation, alerts }: { liveLocation: LiveLocation; alerts: EvaluatedAlert[] | null }) {
+  const { purok } = usePersistedPurok()
+  const { simulation, status } = liveLocation
+  const [planning, setPlanning] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const walking = status === 'simulated'
+  const btn = 'rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:bg-bg-alt disabled:opacity-50'
+
+  async function start() {
+    if (purok === null) return
+    setPlanning(true)
+    setError(null)
+    try {
+      // Walk the route the resident would be shown right now.
+      const severity = (alerts ? latestRelevantAlert(alerts, purok) : undefined)?.body?.severity ?? 0
+      const path = await planWalkPath(purok, severity)
+      if (path === null) setError('No walkable route from this purok.')
+      else liveLocation.simulateWalk(path, simulation.speed)
+    } catch {
+      setError('Could not load the road network.')
+    } finally {
+      setPlanning(false)
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-border bg-surface p-4">
+      <h3 className="mb-1 text-sm font-semibold text-ink">Walk simulator</h3>
+      <p className="mb-3 text-xs text-ink-3">
+        Stands in for the phone's GPS: a fake position walks from the resident's purok to the nearest evacuation
+        center. Raise the river gauge during the walk to watch the route change from where they are.
+      </p>
+
+      {purok === null ? (
+        <p className="text-xs text-ink-2">Pick a purok on the Resident tab first.</p>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            {!walking || !simulation.active ? (
+              <button onClick={start} disabled={planning} className={btn}>
+                {planning ? 'Planning…' : walking ? 'Walk again' : `Start walking from Purok ${purok}`}
+              </button>
+            ) : simulation.paused ? (
+              <button onClick={liveLocation.resumeSimulation} className={btn}>
+                Resume
+              </button>
+            ) : (
+              <button onClick={liveLocation.pauseSimulation} className={btn}>
+                Pause
+              </button>
+            )}
+            {walking && (
+              <button onClick={liveLocation.stopSimulation} className={btn}>
+                Stop
+              </button>
+            )}
+            <div className="ml-auto flex items-center gap-1" role="group" aria-label="Walking speed">
+              {WALK_SPEEDS.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => liveLocation.setSimulationSpeed(s)}
+                  aria-pressed={simulation.speed === s}
+                  className={`rounded px-2 py-1 text-xs font-semibold ${
+                    simulation.speed === s ? 'bg-accent text-white' : 'bg-bg-alt text-ink-2 hover:bg-border'
+                  }`}
+                >
+                  ×{s}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {walking && (
+            <div className="mt-3">
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-bg-alt">
+                <div className="h-full bg-accent" style={{ width: `${Math.round(simulation.progress * 100)}%` }} />
+              </div>
+              <p className="mt-1 text-xs text-ink-2">
+                {simulation.progress >= 1
+                  ? 'Arrived.'
+                  : `${Math.round(simulation.progress * 100)}% of the way${simulation.paused ? ' · paused' : ''}`}{' '}
+                Switch to the Resident tab to watch the dot.
+              </p>
+            </div>
+          )}
+          {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+        </>
+      )}
+    </section>
+  )
+}
+
+export function TesterView({ sim, liveLocation }: { sim: Simulation; liveLocation: LiveLocation }) {
   const [riverLevelCm, setRiverLevelCm] = useState(210)
   const [hazard, setHazard] = useState<number>(defaultBroadcastOptions().hazard)
   const [purokBitmap, setPurokBitmap] = useState(defaultBroadcastOptions().purokBitmap)
@@ -104,6 +206,8 @@ export function TesterView({ sim }: { sim: Simulation }) {
           Same thresholds the Wokwi sensor node uses (<code>apps/sensor-wokwi</code>).
         </p>
       </section>
+
+      <WalkSimulator liveLocation={liveLocation} alerts={sim.evaluated} />
 
       <section className="rounded-lg border border-border bg-surface p-4">
         <h3 className="mb-3 text-sm font-semibold text-ink">Alert contents</h3>

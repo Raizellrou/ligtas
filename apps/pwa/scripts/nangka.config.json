@@ -8,5 +8,8 @@
   "minCenterSeparationMeters": 450,
   "maxSnapMeters": 80,
   "centerOsmIds": ["way/446778587", "node/12030241370", "way/432783339"],
-  "geometryBudgetBytes": 250000
+  "geometryBudgetBytes": 250000,
+  "graphBudgetBytes": 100000,
+  "floodDistanceMeters": { "tier2": 20, "tier3": 50 },
+  "floodProneWayIds": null
 }

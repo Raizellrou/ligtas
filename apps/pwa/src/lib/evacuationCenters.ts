@@ -1,4 +1,5 @@
 import routesJson from '../data/nangka-routes.json'
+import type { Projection } from './geo'
 
 /**
  * Real, offline map data for one barangay (Nangka, Marikina City), baked from
@@ -38,6 +39,7 @@ interface RoutesData {
     source: string
     snapshotDate: string
     viewBox: number[] // [width, height] in SVG units
+    projection: Projection
     layoutNote: string
   }
   centers: { id: string; name: string; short: string; x: number; y: number }[]
@@ -117,7 +119,10 @@ export function formatDistance(meters: number): string {
 // glance, a minute count isn't.
 const METERS_PER_MINUTE = 80
 
+export function walkMinutes(meters: number): number {
+  return Math.max(1, Math.round(meters / METERS_PER_MINUTE))
+}
+
 export function formatWalkTime(meters: number): string {
-  const minutes = Math.max(1, Math.round(meters / METERS_PER_MINUTE))
-  return `~${minutes} min walk`
+  return `~${walkMinutes(meters)} min walk`
 }

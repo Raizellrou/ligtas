@@ -23,7 +23,8 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { gzipSync } from 'node:zlib'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const config = JSON.parse(await readFile(path.join(here, 'nangka.config.json'), 'utf8'))
@@ -265,7 +266,7 @@ const roadClassOf = (highway) => ROAD_CLASS[highway.replace(/_link$/, '')] ?? 'p
 
 const nodeIndex = new Map() // OSM node id -> graph index
 const nodeXY = [] // metres
-const edges = [] // [i, j, metres]
+const edges = [] // [i, j, metres, osmWayId, isBridge]
 const drawn = { major: [], minor: [], path: [] } // polylines in metres, by class
 
 function graphNode(id, lat, lon) {
@@ -283,10 +284,14 @@ for (const way of roadsRes.elements) {
   const cls = roadClassOf(way.tags.highway)
   const pts = way.geometry.map((p) => toMeters(p.lat, p.lon))
   drawn[cls].push(pts)
+  // A bridge stands above the water, so it is never treated as flood-prone.
+  const isBridge = Boolean(way.tags.bridge) && way.tags.bridge !== 'no'
   for (let k = 0; k + 1 < way.nodes.length; k++) {
     const a = graphNode(way.nodes[k], way.geometry[k].lat, way.geometry[k].lon)
     const b = graphNode(way.nodes[k + 1], way.geometry[k + 1].lat, way.geometry[k + 1].lon)
-    if (a !== b) edges.push([a, b, Math.hypot(nodeXY[a][0] - nodeXY[b][0], nodeXY[a][1] - nodeXY[b][1])])
+    if (a !== b) {
+      edges.push([a, b, Math.hypot(nodeXY[a][0] - nodeXY[b][0], nodeXY[a][1] - nodeXY[b][1]), way.id, isBridge])
+    }
   }
 }
 
@@ -588,21 +593,38 @@ const pathOf = (polylines, tolerance) =>
 
 const water = { river: [], stream: [], areas: [] }
 const areaRings = []
+// What the flood model measures against: rivers, streams, canals and water
+// bodies -- not roadside drains, which run beside almost every street and
+// would flag the whole barangay -- and not ponds.
+const floodLines = []
+const floodRings = []
+const FLOOD_WATERWAYS = ['river', 'stream', 'canal']
 for (const el of waterRes.elements) {
   if (el.type === 'way' && el.geometry) {
     const w = el.tags ?? {}
     if (w.natural === 'water' || w.waterway === 'riverbank') {
       const closed = el.geometry.length > 3 && same(el.geometry[0], el.geometry.at(-1))
-      if (closed) areaRings.push(ringM(el.geometry))
-      else water.stream.push(ringM(el.geometry))
+      if (closed) {
+        areaRings.push(ringM(el.geometry))
+        if (w.water !== 'pond') floodRings.push(ringM(el.geometry))
+      } else {
+        water.stream.push(ringM(el.geometry))
+        floodLines.push(ringM(el.geometry))
+      }
     } else {
       ;(w.waterway === 'river' ? water.river : water.stream).push(ringM(el.geometry))
+      if (FLOOD_WATERWAYS.includes(w.waterway)) floodLines.push(ringM(el.geometry))
     }
   } else if (el.type === 'relation') {
     const rings = assembleRings(el.members.filter((m) => m.type === 'way' && m.geometry).map((m) => m.geometry))
     for (const ring of rings) {
-      if (ring.closed) areaRings.push(ringM(ring.pts))
-      else water.stream.push(ringM(ring.pts)) // an unclosed bank still reads as a line
+      if (ring.closed) {
+        areaRings.push(ringM(ring.pts))
+        floodRings.push(ringM(ring.pts))
+      } else {
+        water.stream.push(ringM(ring.pts)) // an unclosed bank still reads as a line
+        floodLines.push(ringM(ring.pts))
+      }
     }
   }
 }
@@ -639,6 +661,9 @@ const routesJson = {
     osmBase: roadsRes.osm3s?.timestamp_osm_base ?? null,
     viewBox: [viewW, viewH],
     metersPerUnit: r1(mpu),
+    // The exact numbers this build projected with, so a GPS fix lands where
+    // the same real-world point was drawn (src/lib/geo.ts).
+    projection: { west, north, mLat: M_LAT, mLon: M_LON, mpu },
     layoutNote: 'Purok positions are a demo layout, not official. Evacuation centers are not LGU-confirmed.',
   },
   centers: centers.map((c) => {
@@ -654,7 +679,84 @@ const routesJson = {
   walkMeters,
 }
 
+// ---------------------------------------------------------------- 6b. flood model + the graph shipped to the app
+
+// DEMO flood model, not a survey: a street is "flood-prone" if it runs close
+// to a river, stream, canal or water body. Within tier2 metres it floods from
+// Alert Tier 2 up; within tier3 metres it floods only at Tier 3. Bridges never
+// flood. A barangay's own knowledge replaces this via config.floodProneWayIds
+// ({ "2": [osmWayId, ...], "3": [...] }).
+const floodSegments = []
+for (const line of floodLines) for (let i = 0; i + 1 < line.length; i++) floodSegments.push([line[i], line[i + 1]])
+for (const ring of floodRings) for (let i = 0; i < ring.length; i++) floodSegments.push([ring[i], ring[(i + 1) % ring.length]])
+
+function distanceToWater(p) {
+  if (floodRings.some((ring) => pointInPolygon(p, ring))) return 0
+  const reach = config.floodDistanceMeters.tier3 + 1
+  let best = Infinity
+  for (const [a, b] of floodSegments) {
+    // Cheap reject: the segment's box is farther than any distance we care about.
+    if (Math.max(a[0], b[0]) < p[0] - reach || Math.min(a[0], b[0]) > p[0] + reach) continue
+    if (Math.max(a[1], b[1]) < p[1] - reach || Math.min(a[1], b[1]) > p[1] + reach) continue
+    best = Math.min(best, distToSegment(p, a, b))
+  }
+  return best
+}
+
+function floodTierOf([a, b, , wayId, isBridge]) {
+  if (isBridge) return 0
+  const overrides = config.floodProneWayIds
+  if (overrides) return overrides['2']?.includes(wayId) ? 2 : overrides['3']?.includes(wayId) ? 3 : 0
+  const d = distanceToWater([(nodeXY[a][0] + nodeXY[b][0]) / 2, (nodeXY[a][1] + nodeXY[b][1]) / 2])
+  return d <= config.floodDistanceMeters.tier2 ? 2 : d <= config.floodDistanceMeters.tier3 ? 3 : 0
+}
+
+// Ship only the connected road network, re-indexed, as flat arrays: a few
+// tens of KB. Edge lengths are recomputed from coordinates at runtime.
+const remap = new Int32Array(nodeXY.length).fill(-1)
+const graphNodes = []
+let keptNodes = 0
+nodeXY.forEach((p, i) => {
+  if (!inGraph(i)) return
+  remap[i] = keptNodes++
+  graphNodes.push(...toUnits(p))
+})
+const graphEdges = []
+let floodString = ''
+for (const e of edges) {
+  if (!inGraph(e[0])) continue
+  graphEdges.push(remap[e[0]], remap[e[1]])
+  floodString += floodTierOf(e)
+}
+const graphJson = {
+  nodes: graphNodes,
+  edges: graphEdges,
+  flood: floodString,
+  centers: Object.fromEntries(centers.map((c) => [c.id, { node: remap[c.node], snapM: r1(c.snap) }])),
+  anchors: purokAnchors.map((a) => remap[a.node]),
+}
+
 // ---------------------------------------------------------------- 7. checks + write
+
+const graphText = JSON.stringify(graphJson)
+const graphBytes = Buffer.byteLength(graphText)
+const graphGzip = gzipSync(graphText).length
+check(graphBytes <= config.graphBudgetBytes, `road graph is ${graphBytes} bytes, over the ${config.graphBudgetBytes} budget`)
+
+// Cross-check: the routing code the app will run (src/lib/routing.ts, loaded
+// here with Node's type stripping) must reproduce the walking distances this
+// script precomputed with its own Dijkstra. If they ever disagree, the map
+// would say one thing and the takeover another.
+const routing = await import(pathToFileURL(path.join(here, '..', 'src', 'lib', 'routing.ts')).href)
+const graph = routing.buildGraph(graphJson, mpu)
+const openFields = routing.centerFields(graph, 0)
+purokAnchors.forEach((_, i) => {
+  for (const c of centers) {
+    const total = openFields[c.id].dist[graphJson.anchors[i]] + graphJson.centers[c.id].snapM
+    const meters = Math.max(10, Math.round(total / 10) * 10)
+    check(Math.abs(meters - walkMeters[i + 1][c.id]) <= 20, `purok ${i + 1} -> ${c.name}: app routing says ${meters} m, build says ${walkMeters[i + 1][c.id]} m`)
+  }
+})
 
 const mapBytes = Buffer.byteLength(JSON.stringify(mapJson))
 check(mapBytes <= config.geometryBudgetBytes, `map geometry is ${mapBytes} bytes, over the ${config.geometryBudgetBytes} budget`)
@@ -675,6 +777,36 @@ for (const p of Object.keys(walkMeters)) {
   console.log(`  purok ${p.padStart(2)}: ${row}   nearest ${centers.reduce((a, b) => (walkMeters[p][a.id] <= walkMeters[p][b.id] ? a : b)).name}`)
 }
 console.log(`\nMap: ${viewW} x ${viewH} units, ${r1(mpu)} m/unit, geometry ${(mapBytes / 1024).toFixed(1)} KB`)
+console.log(`Road graph: ${keptNodes} nodes, ${graph.edgeCount} edges, ${(graphBytes / 1024).toFixed(1)} KB (${(graphGzip / 1024).toFixed(1)} KB gzipped)`)
+
+// What each alert tier does to the routes, so test cases are known, not guessed.
+const tier2Edges = graph.edgeFlood.filter((t) => t === 2).length
+const tier3Edges = graph.edgeFlood.filter((t) => t === 3).length
+console.log(
+  `\nFlood model (demo: closeness to rivers, streams, canals, water bodies): ${tier2Edges} streets flood from Tier 2, ${tier3Edges} more at Tier 3, of ${graph.edgeCount} (${(((tier2Edges + tier3Edges) / graph.edgeCount) * 100).toFixed(1)}%)`,
+)
+const nameOf = (id) => centers.find((c) => c.id === id).name
+for (const severity of [2, 3]) {
+  const fields = routing.centerFields(graph, severity)
+  const blocked = graph.edgeFlood.filter((t) => routing.isBlocked(t, severity)).length
+  let stillReach = 0
+  for (let n = 0; n < graph.nodeCount; n++) if (centers.some((c) => Number.isFinite(fields[c.id].dist[n]))) stillReach++
+  console.log(`  Tier ${severity}: ${blocked} streets blocked; ${((stillReach / graph.nodeCount) * 100).toFixed(1)}% of road nodes still reach a center`)
+  purokAnchors.forEach((_, i) => {
+    const start = graphJson.anchors[i]
+    const ranked = (fs) =>
+      centers
+        .map((c) => ({ id: c.id, m: fs[c.id].dist[start] + graphJson.centers[c.id].snapM }))
+        .filter((o) => Number.isFinite(o.m))
+        .sort((a, b) => a.m - b.m)
+    const before = ranked(openFields)[0]
+    const after = ranked(fields)[0]
+    if (!after) console.log(`    purok ${i + 1}: NO flood-free route to any center`)
+    else if (after.id !== before.id || Math.abs(after.m - before.m) >= 50) {
+      console.log(`    purok ${i + 1}: ${nameOf(before.id)} ${Math.round(before.m)} m -> ${nameOf(after.id)} ${Math.round(after.m)} m`)
+    }
+  })
+}
 
 if (failures.length) {
   console.error('\nSelf-checks FAILED:')
@@ -684,5 +816,6 @@ if (failures.length) {
 
 await mkdir(OUT_DIR, { recursive: true })
 await writeFile(path.join(OUT_DIR, 'nangka-map.json'), JSON.stringify(mapJson))
+await writeFile(path.join(OUT_DIR, 'nangka-graph.json'), graphText)
 await writeFile(path.join(OUT_DIR, 'nangka-routes.json'), JSON.stringify(routesJson, null, 2) + '\n')
-console.log('\nSelf-checks passed. Wrote src/data/nangka-map.json and src/data/nangka-routes.json')
+console.log('\nSelf-checks passed. Wrote nangka-map.json, nangka-graph.json and nangka-routes.json in src/data/')

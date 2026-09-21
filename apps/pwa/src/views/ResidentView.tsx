@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { latestRelevantAlert, type EvaluatedAlert } from '../lib/evaluateBundle'
 import { alertLevel, instructionFor, severityLabel } from '../lib/instructions'
-import { nearestCenterFor } from '../lib/evacuationCenters'
+import { useEvacuationRoute } from '../lib/useEvacuationRoute'
+import type { LiveLocation, LivePosition } from '../lib/useLiveLocation'
 import { usePersistedPurok } from '../usePersistedPurok'
 import { useDismissedAlert } from '../useDismissedAlert'
+import { useJoinSkipped } from '../useJoinSkipped'
 import type { UseHouseholdCheckin } from '../lib/useHouseholdCheckin'
 import { useReliefBalance } from '../lib/useReliefBalance'
 import { HouseholdCheckin } from './HouseholdCheckin'
@@ -34,11 +36,13 @@ export function ResidentView({
   alerts,
   capturedCount,
   checkin,
+  liveLocation,
   offline,
 }: {
   alerts: EvaluatedAlert[] | null
   capturedCount: number
   checkin: UseHouseholdCheckin
+  liveLocation: LiveLocation
   offline: boolean
 }) {
   const { purok, setPurok, clearPurok } = usePersistedPurok()
@@ -48,6 +52,9 @@ export function ResidentView({
   // would read as "you got relief" for an event that isn't happening.
   const relief = useReliefBalance(checkin.stellarAddress)
   const { dismissed, dismiss } = useDismissedAlert()
+  const { skipped, skip, unskip } = useJoinSkipped()
+  // The resident tapped "Join household" from the home screen after skipping.
+  const [joining, setJoining] = useState(false)
 
   if (purok === null) return <PurokPicker onSelect={setPurok} />
 
@@ -60,10 +67,42 @@ export function ResidentView({
   const latest = alerts !== null ? latestRelevantAlert(alerts, purok) : undefined
   const latestKey = latest === undefined ? null : (latest.alertHashHex ?? String(latest.index))
   if (latest?.body && latestKey !== null && latestKey !== dismissed && alertLevel(latest.body.severity) === 'evacuate') {
-    return <EmergencyNotice body={latest.body} purok={purok} checkin={checkin} onContinue={() => dismiss(latestKey)} />
+    return (
+      <EmergencyNotice
+        body={latest.body}
+        purok={purok}
+        checkin={checkin}
+        position={liveLocation.position}
+        onContinue={() => {
+          dismiss(latestKey)
+          // "Show my route" must lead to the route. An unjoined resident
+          // would otherwise land on the join form, mid-evacuation.
+          if (!checkin.joined) skip()
+        }}
+      />
+    )
   }
 
-  if (!checkin.joined) return <JoinStep purok={purok} join={checkin.join} onBack={clearPurok} />
+  // Joining is offered, never required: it needs the hub, while the alert
+  // card and the evacuation map below work without it.
+  if (!checkin.joined && (!skipped || joining)) {
+    return (
+      <JoinStep
+        purok={purok}
+        join={async (code, name) => {
+          const result = await checkin.join(code, name)
+          if (result === 'ok') {
+            unskip()
+            setJoining(false)
+          }
+          return result
+        }}
+        onSkip={skipped ? undefined : skip}
+        onBack={joining ? () => setJoining(false) : clearPurok}
+        backLabel={joining ? 'Back' : 'Back to purok selection'}
+      />
+    )
+  }
 
   // Only alerts actually broadcast live this session count toward relief --
   // the leading captured entries are a historical demo recording (Sep
@@ -104,14 +143,14 @@ export function ResidentView({
         </div>
       </div>
 
-      <HouseholdCheckin {...checkin} />
+      {checkin.joined ? <HouseholdCheckin {...checkin} /> : <JoinPrompt onJoin={() => setJoining(true)} />}
 
-      <EvacuationMap purok={purok} alerts={alerts} />
+      <EvacuationMap purok={purok} alerts={alerts} liveLocation={liveLocation} />
 
       {alerts === null ? (
         <p className="text-ink-2">Loading alerts…</p>
       ) : (
-        <AlertList alerts={alerts} purok={purok} />
+        <AlertList alerts={alerts} purok={purok} position={liveLocation.position} />
       )}
     </>
   )
@@ -180,14 +219,38 @@ function PurokPicker({ onSelect }: { onSelect: (p: number) => void }) {
   )
 }
 
+// Shown on the home screen in place of the family check-in card until the
+// resident joins. Joining is the only part of the app that needs the hub.
+function JoinPrompt({ onJoin }: { onJoin: () => void }) {
+  return (
+    <div className="mb-6 rounded-lg border border-border bg-surface p-4">
+      <p className="mb-1 text-sm font-semibold text-ink">Household check-in</p>
+      <p className="mb-3 text-xs text-ink-2">
+        Join your household so your family can see you're safe. Needs a connection to the hub; alerts and the map
+        work without it.
+      </p>
+      <button
+        onClick={onJoin}
+        className="w-full rounded-lg border border-accent py-2.5 text-sm font-semibold text-ink hover:bg-accent-bg"
+      >
+        Join household
+      </button>
+    </div>
+  )
+}
+
 function JoinStep({
   purok,
   join,
+  onSkip,
   onBack,
+  backLabel,
 }: {
   purok: number
   join: UseHouseholdCheckin['join']
+  onSkip?: () => void
   onBack: () => void
+  backLabel: string
 }) {
   const joinCode = JOIN_CODE_OPTIONS.find((o) => o.purok === purok)?.code ?? JOIN_CODE_OPTIONS[0]!.code
   const [name, setName] = useState('')
@@ -233,19 +296,33 @@ function JoinStep({
         <p className="mt-2 text-xs text-accent-deep">Can't reach the hub right now — try again once connected.</p>
       )}
 
+      {onSkip && (
+        <>
+          <button
+            onClick={onSkip}
+            className="mt-3 w-full rounded-lg border border-border py-3 text-sm font-semibold text-ink-2 hover:bg-bg-alt"
+          >
+            Skip for now
+          </button>
+          <p className="mt-1 text-center text-xs text-ink-3">
+            You'll still get alerts and the evacuation map. Join anytime.
+          </p>
+        </>
+      )}
+
       <button onClick={onBack} className="mt-3 w-full text-center text-xs text-ink-3 underline hover:text-ink-2">
-        Back to purok selection
+        {backLabel}
       </button>
     </div>
   )
 }
 
-function AlertList({ alerts, purok }: { alerts: EvaluatedAlert[]; purok: number }) {
+function AlertList({ alerts, purok, position }: { alerts: EvaluatedAlert[]; purok: number; position: LivePosition | null }) {
   const accepted = alerts.filter((a) => a.outcome === 'accepted' && a.body)
   const latest = latestRelevantAlert(alerts, purok)
 
   return latest ? (
-    <InstructionCard alert={latest} purok={purok} />
+    <InstructionCard alert={latest} purok={purok} position={position} />
   ) : accepted.length > 0 ? (
     <div className="mb-6 rounded border border-border bg-surface p-4">
       <p className="text-ink-2">Your purok is not affected by any current alert.</p>
@@ -260,10 +337,11 @@ function AlertList({ alerts, purok }: { alerts: EvaluatedAlert[]; purok: number 
 // Tier decides how loud the card is: only an evacuation is red, a "prepare"
 // is marigold, and a "watch" is a quiet info note -- so red keeps meaning
 // "go now". Tier 3 names the same nearest center the map and the takeover do.
-function InstructionCard({ alert, purok }: { alert: EvaluatedAlert; purok: number }) {
+function InstructionCard({ alert, purok, position }: { alert: EvaluatedAlert; purok: number; position: LivePosition | null }) {
   const body = alert.body!
   const level = alertLevel(body.severity)
-  const text = instructionFor(body, level === 'evacuate' ? nearestCenterFor(purok).center.name : undefined)
+  const route = useEvacuationRoute({ purok, severity: body.severity, position })
+  const text = instructionFor(body, level === 'evacuate' ? route.nearest.center.name : undefined)
 
   if (level === 'watch') {
     return (

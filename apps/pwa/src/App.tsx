@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSimulation } from './lib/useSimulation'
 import { useHouseholdCheckin } from './lib/useHouseholdCheckin'
+import { useLiveLocation } from './lib/useLiveLocation'
 import { ResidentView } from './views/ResidentView'
 import { TesterView } from './views/TesterView'
 import { HowItWorksView } from './views/HowItWorksView'
@@ -27,6 +28,9 @@ function App() {
   const [showSplash, setShowSplash] = useState(true)
   const sim = useSimulation()
   const checkin = useHouseholdCheckin()
+  // Lives here, not in a view: a running walk simulation must survive the
+  // resident switching to the Tester tab to raise the river.
+  const liveLocation = useLiveLocation()
 
   function setRole(next: Role) {
     localStorage.setItem(ROLE_STORAGE_KEY, next)
@@ -99,10 +103,11 @@ function App() {
             alerts={sim.evaluated}
             capturedCount={sim.capturedCount}
             checkin={checkin}
+            liveLocation={liveLocation}
             offline={sim.offline}
           />
         )}
-        {role === 'tester' && <TesterView sim={sim} />}
+        {role === 'tester' && <TesterView sim={sim} liveLocation={liveLocation} />}
         {role === 'how' && <HowItWorksView />}
 
         <div className="mt-10 border-t border-border pt-3 text-center">

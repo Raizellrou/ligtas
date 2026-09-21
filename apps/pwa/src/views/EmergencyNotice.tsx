@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import type { AlertBody } from '@ligtas/core'
 import type { CheckinStatus } from '../lib/checkinQueue'
-import { formatWalkTime, nearestCenterFor } from '../lib/evacuationCenters'
+import { formatWalkTime, walkMinutes } from '../lib/evacuationCenters'
 import { hazardLabel } from '../lib/instructions'
+import { useEvacuationRoute } from '../lib/useEvacuationRoute'
 import type { UseHouseholdCheckin } from '../lib/useHouseholdCheckin'
+import type { LivePosition } from '../lib/useLiveLocation'
 
 function affectedPuroks(purokBitmap: number): number[] {
   return Array.from({ length: 12 }, (_, i) => i + 1).filter((p) => (purokBitmap & (1 << (p - 1))) !== 0)
@@ -11,7 +13,9 @@ function affectedPuroks(purokBitmap: number): number[] {
 
 // Full-screen takeover for an evacuation (Tier 3) only -- lower tiers are a
 // card on the home screen. It leads with where to go: the nearest center is
-// computed from local static data, so it renders with no connection at all.
+// computed from local static data, so it renders with no connection at all,
+// and it comes from the same route hook as the map, so the two always agree
+// (including when a GPS fix or flooded streets change the answer).
 // The check-in buttons are shown only to a joined household, and confirm
 // with wording that is always true (the tap is queued on this phone before
 // the network is touched, but the family only sees it once it syncs).
@@ -19,15 +23,18 @@ export function EmergencyNotice({
   body,
   purok,
   checkin,
+  position,
   onContinue,
 }: {
   body: AlertBody
   purok: number
   checkin: UseHouseholdCheckin
+  position: LivePosition | null
   onContinue: () => void
 }) {
   const puroks = affectedPuroks(body.purokBitmap)
-  const nearest = nearestCenterFor(purok)
+  const route = useEvacuationRoute({ purok, severity: body.severity, position })
+  const nearest = route.nearest
   const [sent, setSent] = useState<CheckinStatus | null>(null)
 
   function tell(status: CheckinStatus) {
@@ -62,6 +69,17 @@ export function EmergencyNotice({
           <p className="font-display text-xl font-semibold text-ink">{nearest.center.name}</p>
           <p className="mt-1 text-sm font-semibold text-ink-2">{formatWalkTime(nearest.meters)}</p>
           {nearest.center.note && <p className="mt-1 text-xs text-ink-3">{nearest.center.note}</p>}
+          {route.allFlooded ? (
+            <p className="mt-2 text-xs font-semibold text-danger-deep">
+              Every known route may be flooded. Follow barangay officials.
+            </p>
+          ) : (
+            route.detourMeters !== null && (
+              <p className="mt-2 text-xs text-ink-2">
+                Avoids streets likely flooded (+{walkMinutes(route.detourMeters)} min).
+              </p>
+            )
+          )}
         </div>
 
         <button

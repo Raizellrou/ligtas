@@ -9,6 +9,13 @@
       252.7
     ],
     "metersPerUnit": 6.6,
+    "projection": {
+      "west": 121.09686152108743,
+      "north": 14.676693871732958,
+      "mLat": 110574,
+      "mLon": 107691.43973315261,
+      "mpu": 6.600773906603495
+    },
     "layoutNote": "Purok positions are a demo layout, not official. Evacuation centers are not LGU-confirmed."
   },
   "centers": [

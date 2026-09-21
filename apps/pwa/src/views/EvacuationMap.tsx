@@ -6,13 +6,15 @@ import {
   MAP_CENTERS,
   MAP_META,
   PUROK_ANCHORS,
-  centerDistancesFor,
   formatWalkTime,
   loadMapGeometry,
-  routeKeyFor,
   purokAnchorFor,
+  routeKeyFor,
+  walkMinutes,
   type MapGeometry,
 } from '../lib/evacuationCenters'
+import { useEvacuationRoute, type EvacuationRoute } from '../lib/useEvacuationRoute'
+import type { LiveLocation } from '../lib/useLiveLocation'
 
 const [VIEW_W, VIEW_H] = MAP_META.viewBox
 
@@ -50,16 +52,26 @@ const CENTER_LABEL_SLOT = new Map(
  * the two surfaces can't disagree about what's currently active.
  *
  * The map is a real, fixed, offline snapshot of one barangay's roads (see
- * lib/evacuationCenters.ts). Both the "nearest" center and the drawn dotted
- * route come from the same precomputed walking routes, so what is drawn and
- * what the distance says can't drift apart. The road geometry loads as its
- * own precached chunk; the header and distance list render without it.
+ * lib/evacuationCenters.ts). Where to go, how long it takes and the drawn
+ * route all come from useEvacuationRoute, which routes from the resident's
+ * live location when there is one and around streets likely flooded at the
+ * current alert tier. The road geometry loads as its own precached chunk; the
+ * header and distance list render without it.
  */
-export function EvacuationMap({ purok, alerts }: { purok: number; alerts: EvaluatedAlert[] | null }) {
-  const distances = centerDistancesFor(purok)
-  const nearest = distances[0]
+export function EvacuationMap({
+  purok,
+  alerts,
+  liveLocation,
+}: {
+  purok: number
+  alerts: EvaluatedAlert[] | null
+  liveLocation: LiveLocation
+}) {
   const latest = alerts ? latestRelevantAlert(alerts, purok) : undefined
+  const severity = latest?.body?.severity ?? 0
   const urgent = latest?.body !== undefined && alertLevel(latest.body.severity) === 'evacuate'
+  const route = useEvacuationRoute({ purok, severity, position: liveLocation.position })
+  const { ranked, nearest } = route
 
   const [geometry, setGeometry] = useState<MapGeometry | null>(null)
   const [failed, setFailed] = useState(false)
@@ -82,6 +94,7 @@ export function EvacuationMap({ purok, alerts }: { purok: number; alerts: Evalua
       <div className="mb-3">
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-3">
           {urgent ? 'Evacuate now to' : 'Nearest evacuation center'}
+          {route.mode === 'from-you' && ' · from your location'}
         </p>
         <div className="flex items-center justify-between gap-2">
           <span className="font-display text-lg font-semibold text-ink">{nearest.center.name}</span>
@@ -96,19 +109,23 @@ export function EvacuationMap({ purok, alerts }: { purok: number; alerts: Evalua
         {nearest.center.note && <p className="mt-1 text-xs text-ink-3">{nearest.center.note}</p>}
       </div>
 
+      <FloodNotice route={route} />
+
       <ul className="mb-3 space-y-1 text-xs">
-        {distances.map(({ center, meters }) => (
+        {ranked.map(({ center, meters }) => (
           <li key={center.id} className="flex items-center justify-between gap-3">
             <span className={center.id === nearest.center.id ? 'font-semibold text-ink' : 'text-ink-2'}>
               {center.name}
             </span>
-            <span className="whitespace-nowrap text-ink-3">{formatWalkTime(meters)}</span>
+            <span className="whitespace-nowrap text-ink-3">
+              {meters === null ? 'cut off by flooding' : formatWalkTime(meters)}
+            </span>
           </li>
         ))}
       </ul>
 
       {geometry ? (
-        <MapSvg geometry={geometry} purok={purok} nearestId={nearest.center.id} urgent={urgent} />
+        <MapSvg geometry={geometry} purok={purok} route={route} urgent={urgent} />
       ) : (
         <div
           className="flex w-full items-center justify-center rounded bg-bg-alt/50 text-xs text-ink-2"
@@ -118,8 +135,18 @@ export function EvacuationMap({ purok, alerts }: { purok: number; alerts: Evalua
         </div>
       )}
 
+      {route.blockingTier > 0 && route.blockedD !== null && (
+        <p className="mt-2 flex items-center gap-2 text-xs text-ink-2">
+          <span className="h-1 w-5 rounded-full bg-accent" />
+          Streets likely flooded at Tier {route.blockingTier} (demo, not surveyed)
+        </p>
+      )}
+
+      <LocationControl liveLocation={liveLocation} outsideMap={route.outsideMap} />
+
       <p className="mt-2 text-xs text-ink-2">
-        Usual walking route. Roads may be flooded; follow barangay officials.
+        Usual walking route. From Tier 2 up it avoids streets known to flood, which is not live conditions. Roads
+        may be flooded; follow barangay officials.
       </p>
       <p className="mt-1 text-xs text-ink-2">
         © {MAP_META.source.replace(' (ODbL)', '')} ({MAP_META.snapshotDate}). Demo layout, not official.
@@ -128,27 +155,89 @@ export function EvacuationMap({ purok, alerts }: { purok: number; alerts: Evalua
   )
 }
 
+function FloodNotice({ route }: { route: EvacuationRoute }) {
+  if (route.blockingTier === 0) return null
+  if (route.allFlooded) {
+    return (
+      <p className="mb-3 rounded border border-danger bg-danger-bg px-2 py-1.5 text-xs font-semibold text-danger-deep">
+        Every known route from here may be flooded. The route shown ignores flooding. Follow barangay officials.
+      </p>
+    )
+  }
+  return (
+    <p className="mb-3 rounded border border-accent bg-accent-bg px-2 py-1.5 text-xs text-ink-2">
+      Avoiding streets likely flooded at Tier {route.blockingTier}
+      {route.detourMeters !== null && ` (+${walkMinutes(route.detourMeters)} min)`}.
+    </p>
+  )
+}
+
+function LocationControl({ liveLocation, outsideMap }: { liveLocation: LiveLocation; outsideMap: boolean }) {
+  const { status, position, hint, simulation } = liveLocation
+  const button =
+    'rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:bg-bg-alt'
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-ink-2">
+          {status === 'off' && 'Show where you are on the map.'}
+          {status === 'locating' && (hint ?? 'Finding you…')}
+          {status === 'active' && `Live location · ±${Math.round(position?.accuracy ?? 0)} m`}
+          {status === 'simulated' &&
+            `Simulated walk (demo) · ${Math.round(simulation.progress * 100)}%${simulation.progress >= 1 ? ' · arrived' : ''}`}
+          {status === 'denied' && 'Location is blocked for this site. Allow it in your browser settings.'}
+          {status === 'insecure' && 'Location needs a secure page (https or localhost).'}
+          {status === 'unsupported' && "This device can't share its location."}
+        </span>
+        {(status === 'off' || status === 'denied' || status === 'insecure' || status === 'unsupported') && (
+          <button onClick={liveLocation.start} className={button}>
+            {status === 'off' ? 'Show my location' : 'Try again'}
+          </button>
+        )}
+        {(status === 'locating' || status === 'active') && (
+          <button onClick={liveLocation.stop} className={button}>
+            Stop
+          </button>
+        )}
+        {status === 'simulated' && (
+          <button onClick={liveLocation.stopSimulation} className={button}>
+            Stop
+          </button>
+        )}
+      </div>
+      {outsideMap && (
+        <p className="mt-1 text-xs text-ink-2">You're outside the mapped area, so the route starts from your purok.</p>
+      )}
+      <p className="mt-1 text-xs text-ink-3">Your location stays on this phone. It works without internet.</p>
+    </div>
+  )
+}
+
 function MapSvg({
   geometry,
   purok,
-  nearestId,
+  route,
   urgent,
 }: {
   geometry: MapGeometry
   purok: number
-  nearestId: string
+  route: EvacuationRoute
   urgent: boolean
 }) {
+  const nearestId = route.nearest.center.id
   const nearest = MAP_CENTERS.find((c) => c.id === nearestId)!
-  const route = geometry.routes[routeKeyFor(purok)]?.[nearestId]
+  // Until the road graph loads, draw the precomputed route for this purok.
+  const routeD = route.routeD ?? geometry.routes[routeKeyFor(purok)]?.[nearestId]
   const mine = purokAnchorFor(purok)
+  const you = route.you
 
   return (
     <svg
       viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
       className="w-full rounded bg-bg-alt/50"
       role="img"
-      aria-label={`Map of ${MAP_META.barangay} showing purok ${mine.purok} and its nearest evacuation center, ${nearest.name}`}
+      aria-label={`Map of ${MAP_META.barangay} showing purok ${mine.purok}${you ? ', your location' : ''} and its nearest evacuation center, ${nearest.name}`}
     >
       <path d={geometry.water.areas} fillRule="evenodd" className="fill-info/20" />
       <path
@@ -186,6 +275,17 @@ function MapSvg({
         strokeLinecap="round"
       />
 
+      {route.blockedD !== null && (
+        <path
+          d={route.blockedD}
+          fill="none"
+          className="stroke-accent"
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeOpacity={0.85}
+        />
+      )}
+
       {/* Veil everything outside the barangay boundary, then outline the boundary itself. */}
       <path
         d={`M-10 -10H${VIEW_W + 10}V${VIEW_H + 10}H-10Z${geometry.boundary}`}
@@ -194,10 +294,10 @@ function MapSvg({
       />
       <path d={geometry.boundary} fill="none" className="stroke-ink-3" strokeWidth={1} strokeDasharray="5 3" />
 
-      {route && (
+      {routeD && (
         <>
           <path
-            d={route}
+            d={routeD}
             fill="none"
             className="stroke-bg"
             strokeWidth={urgent ? 5.5 : 4.5}
@@ -205,9 +305,9 @@ function MapSvg({
             strokeLinecap="round"
           />
           <path
-            d={route}
+            d={routeD}
             fill="none"
-            className={urgent ? 'stroke-danger' : 'stroke-info'}
+            className={urgent || route.allFlooded ? 'stroke-danger' : 'stroke-info'}
             strokeWidth={urgent ? 3 : 2.2}
             strokeLinejoin="round"
             strokeLinecap="round"
@@ -224,13 +324,7 @@ function MapSvg({
               cx={a.x}
               cy={a.y}
               r={isMine ? 8 : 5.5}
-              className={
-                isMine
-                  ? urgent
-                    ? 'fill-danger-deep stroke-bg'
-                    : 'fill-info stroke-bg'
-                  : 'fill-surface stroke-ink-3'
-              }
+              className={isMine ? (urgent ? 'fill-danger-deep stroke-bg' : 'fill-ink stroke-bg') : 'fill-surface stroke-ink-3'}
               strokeWidth={isMine ? 1.5 : 0.8}
             />
             <text
@@ -270,6 +364,13 @@ function MapSvg({
           </g>
         )
       })}
+
+      {you && (
+        <g>
+          <circle cx={you.x} cy={you.y} r={Math.min(40, Math.max(6, you.accuracyUnits))} className="fill-info/15 stroke-info/40" strokeWidth={0.8} />
+          <circle cx={you.x} cy={you.y} r={5} className="fill-info stroke-white" strokeWidth={2} />
+        </g>
+      )}
     </svg>
   )
 }
