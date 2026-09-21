@@ -1,11 +1,14 @@
 import { useState, type FormEvent } from 'react'
 import { latestRelevantAlert, type EvaluatedAlert } from '../lib/evaluateBundle'
-import { instructionFor, severityLabel } from '../lib/instructions'
+import { alertLevel, instructionFor, severityLabel } from '../lib/instructions'
+import { nearestCenterFor } from '../lib/evacuationCenters'
 import { usePersistedPurok } from '../usePersistedPurok'
+import { useDismissedAlert } from '../useDismissedAlert'
 import type { UseHouseholdCheckin } from '../lib/useHouseholdCheckin'
 import { useReliefBalance } from '../lib/useReliefBalance'
 import { HouseholdCheckin } from './HouseholdCheckin'
 import { EvacuationMap } from './EvacuationMap'
+import { EmergencyNotice } from './EmergencyNotice'
 
 // Mirrors packages/hub/config/households.json's seed data -- one test join
 // code per purok, so onboarding can offer a dropdown instead of asking
@@ -44,8 +47,22 @@ export function ResidentView({
   // claimable balance (e.g. from a past drill), and showing that here
   // would read as "you got relief" for an event that isn't happening.
   const relief = useReliefBalance(checkin.stellarAddress)
+  const { dismissed, dismiss } = useDismissedAlert()
 
   if (purok === null) return <PurokPicker onSelect={setPurok} />
+
+  // The evacuation takeover only needs the purok -- deliberately checked
+  // before the household-join gate below. Joining needs the hub, and an
+  // evacuation alert must not be hidden from a resident who can't reach it.
+  // Only Tier 3 interrupts the screen; lower tiers are a card on the home
+  // screen (see alertLevel). The newest accepted alert wins, so a later
+  // lower-tier alert reads as de-escalation.
+  const latest = alerts !== null ? latestRelevantAlert(alerts, purok) : undefined
+  const latestKey = latest === undefined ? null : (latest.alertHashHex ?? String(latest.index))
+  if (latest?.body && latestKey !== null && latestKey !== dismissed && alertLevel(latest.body.severity) === 'evacuate') {
+    return <EmergencyNotice body={latest.body} purok={purok} checkin={checkin} onContinue={() => dismiss(latestKey)} />
+  }
+
   if (!checkin.joined) return <JoinStep purok={purok} join={checkin.join} onBack={clearPurok} />
 
   // Only alerts actually broadcast live this session count toward relief --
@@ -228,7 +245,7 @@ function AlertList({ alerts, purok }: { alerts: EvaluatedAlert[]; purok: number 
   const latest = latestRelevantAlert(alerts, purok)
 
   return latest ? (
-    <InstructionCard alert={latest} />
+    <InstructionCard alert={latest} purok={purok} />
   ) : accepted.length > 0 ? (
     <div className="mb-6 rounded border border-border bg-surface p-4">
       <p className="text-ink-2">Your purok is not affected by any current alert.</p>
@@ -240,12 +257,29 @@ function AlertList({ alerts, purok }: { alerts: EvaluatedAlert[]; purok: number 
   )
 }
 
-function InstructionCard({ alert }: { alert: EvaluatedAlert }) {
+// Tier decides how loud the card is: only an evacuation is red, a "prepare"
+// is marigold, and a "watch" is a quiet info note -- so red keeps meaning
+// "go now". Tier 3 names the same nearest center the map and the takeover do.
+function InstructionCard({ alert, purok }: { alert: EvaluatedAlert; purok: number }) {
   const body = alert.body!
+  const level = alertLevel(body.severity)
+  const text = instructionFor(body, level === 'evacuate' ? nearestCenterFor(purok).center.name : undefined)
+
+  if (level === 'watch') {
+    return (
+      <div className="mb-6 rounded-lg border border-info bg-info-bg p-4">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-2">{severityLabel(body.severity)} · Watch</p>
+        <p className="text-sm text-ink-2">{text}</p>
+      </div>
+    )
+  }
+
+  const box = level === 'prepare' ? 'border-accent bg-accent-bg' : 'border-danger bg-danger-bg'
+  const eyebrow = level === 'prepare' ? 'text-ink-2' : 'text-danger-deep'
   return (
-    <div className="mb-6 rounded-lg border border-danger bg-danger-bg p-4">
-      <p className="mb-1 text-xs uppercase tracking-wide text-danger-deep">{severityLabel(body.severity)} alert</p>
-      <p className="font-display text-lg font-semibold text-ink">{instructionFor(body)}</p>
+    <div className={`mb-6 rounded-lg border p-4 ${box}`}>
+      <p className={`mb-1 text-xs font-semibold uppercase tracking-wide ${eyebrow}`}>{severityLabel(body.severity)} alert</p>
+      <p className="font-display text-lg font-semibold text-ink">{text}</p>
     </div>
   )
 }
