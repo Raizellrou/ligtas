@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { activeEvacuation } from '../lib/activeEvacuation'
 import { latestRelevantAlert, type EvaluatedAlert } from '../lib/evaluateBundle'
 import { alertLevel, instructionFor, severityLabel } from '../lib/instructions'
 import { useEvacuationRoute } from '../lib/useEvacuationRoute'
@@ -62,19 +63,18 @@ export function ResidentView({
   // before the household-join gate below. Joining needs the hub, and an
   // evacuation alert must not be hidden from a resident who can't reach it.
   // Only Tier 3 interrupts the screen; lower tiers are a card on the home
-  // screen (see alertLevel). The newest accepted alert wins, so a later
-  // lower-tier alert reads as de-escalation.
-  const latest = alerts !== null ? latestRelevantAlert(alerts, purok) : undefined
-  const latestKey = latest === undefined ? null : (latest.alertHashHex ?? String(latest.index))
-  if (latest?.body && latestKey !== null && latestKey !== dismissed && alertLevel(latest.body.severity) === 'evacuate') {
+  // screen. The rule lives in activeEvacuation, shared with App so it can
+  // skip the splash for the same alert.
+  const evacuation = activeEvacuation(alerts, purok, dismissed)
+  if (evacuation !== null) {
     return (
       <EmergencyNotice
-        body={latest.body}
+        body={evacuation.body}
         purok={purok}
         checkin={checkin}
         position={liveLocation.position}
         onContinue={() => {
-          dismiss(latestKey)
+          dismiss(evacuation.key)
           // "Show my route" must lead to the route. An unjoined resident
           // would otherwise land on the join form, mid-evacuation.
           if (!checkin.joined) skip()

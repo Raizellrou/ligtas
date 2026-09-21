@@ -14,12 +14,15 @@ export interface PersistedPurok {
   clearPurok: () => void
 }
 
+/** The persisted purok, read straight from storage, for code that has no purok state of its own. */
+export function readPersistedPurok(): number | null {
+  const stored = localStorage.getItem(STORAGE_KEY)
+  const parsed = stored === null ? null : Number(stored)
+  return parsed !== null && Number.isInteger(parsed) && parsed >= 1 && parsed <= 32 ? parsed : null
+}
+
 export function usePersistedPurok(): PersistedPurok {
-  const [purok, setPurokState] = useState<number | null>(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    const parsed = stored === null ? null : Number(stored)
-    return parsed !== null && Number.isInteger(parsed) && parsed >= 1 && parsed <= 32 ? parsed : null
-  })
+  const [purok, setPurokState] = useState<number | null>(readPersistedPurok)
 
   function setPurok(next: number) {
     localStorage.setItem(STORAGE_KEY, String(next))

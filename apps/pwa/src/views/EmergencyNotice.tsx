@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { AlertBody } from '@ligtas/core'
+import { stopVibration, vibrateEmergency } from '../lib/alertFeedback'
 import type { CheckinStatus } from '../lib/checkinQueue'
 import { formatWalkTime, walkMinutes } from '../lib/evacuationCenters'
 import { hazardLabel } from '../lib/instructions'
@@ -19,6 +21,12 @@ function affectedPuroks(purokBitmap: number): number[] {
 // The check-in buttons are shown only to a joined household, and confirm
 // with wording that is always true (the tap is queued on this phone before
 // the network is touched, but the family only sees it once it syncs).
+//
+// A real modal: it is rendered outside #root and #root is made inert while it
+// is up, so keyboard focus and screen readers cannot reach the page behind it
+// (no hand-rolled focus trap needed). Escape deliberately does nothing -- the
+// resident leaves it with "Show my route". It vibrates once on appearing; see
+// lib/alertFeedback.ts for what that can and can't do.
 export function EmergencyNotice({
   body,
   purok,
@@ -42,12 +50,24 @@ export function EmergencyNotice({
     setSent(status)
   }
 
-  return (
+  useEffect(() => {
+    const root = document.getElementById('root')
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    if (root) root.inert = true
+    vibrateEmergency()
+    return () => {
+      if (root) root.inert = false
+      stopVibration()
+      previouslyFocused?.focus()
+    }
+  }, [])
+
+  return createPortal(
     <div
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="emergency-title"
-      className="fixed inset-0 z-50 overflow-y-auto bg-bg"
+      className="fixed inset-0 z-50 overflow-y-auto bg-bg text-ink"
     >
       <div className="flex min-h-full flex-col items-center justify-center p-6 text-center">
         <div className="relative mb-5 flex h-24 w-24 shrink-0 items-center justify-center">
@@ -117,6 +137,7 @@ export function EmergencyNotice({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

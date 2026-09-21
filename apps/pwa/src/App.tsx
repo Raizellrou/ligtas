@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useSimulation } from './lib/useSimulation'
 import { useHouseholdCheckin } from './lib/useHouseholdCheckin'
+import { activeEvacuation } from './lib/activeEvacuation'
 import { useLiveLocation } from './lib/useLiveLocation'
+import { readDismissedAlert } from './useDismissedAlert'
+import { readPersistedPurok } from './usePersistedPurok'
 import { ResidentView } from './views/ResidentView'
 import { TesterView } from './views/TesterView'
 import { HowItWorksView } from './views/HowItWorksView'
@@ -36,6 +39,16 @@ function App() {
     localStorage.setItem(ROLE_STORAGE_KEY, next)
     setRoleState(next)
   }
+
+  // An evacuation must never wait behind the splash, or behind whichever tab
+  // the resident happened to leave the app on. Both are settled here, while
+  // rendering, so there is no frame of the wrong screen. The role is switched
+  // for this session only (not persisted): the resident's saved tab comes back
+  // next time. The simulator tab is left alone -- a tester sending a Tier 3
+  // should not be pulled off their own controls.
+  const evacuation = activeEvacuation(sim.evaluated, readPersistedPurok(), readDismissedAlert())
+  if (evacuation !== null && showSplash) setShowSplash(false)
+  if (evacuation !== null && role === 'how') setRoleState('resident')
 
   if (showSplash) return <SplashScreen onContinue={() => setShowSplash(false)} />
 
