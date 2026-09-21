@@ -1,0 +1,167 @@
+{
+  "meta": {
+    "barangay": "Nangka, Marikina City",
+    "source": "OpenStreetMap contributors (ODbL)",
+    "snapshotDate": "2026-09-21",
+    "osmBase": "2026-09-21T09:28:51Z",
+    "viewBox": [
+      400,
+      252.7
+    ],
+    "metersPerUnit": 6.6,
+    "layoutNote": "Purok positions are a demo layout, not official. Evacuation centers are not LGU-confirmed."
+  },
+  "centers": [
+    {
+      "id": "center-a",
+      "name": "Saint Mary Elementary School",
+      "kind": "school",
+      "short": "School",
+      "osm": "way/446778587",
+      "x": 271.2,
+      "y": 133.9
+    },
+    {
+      "id": "center-b",
+      "name": "Nagkaisa sa Nangka HOA Multipurpose Hall",
+      "kind": "hall",
+      "short": "Hall",
+      "osm": "node/12030241370",
+      "x": 77.9,
+      "y": 127.3
+    },
+    {
+      "id": "center-c",
+      "name": "Nangka Gym",
+      "kind": "court",
+      "short": "Gym",
+      "osm": "way/432783339",
+      "x": 188.4,
+      "y": 70.7
+    }
+  ],
+  "puroks": [
+    {
+      "purok": 1,
+      "x": 127.4,
+      "y": 76.9
+    },
+    {
+      "purok": 2,
+      "x": 155.9,
+      "y": 111.4
+    },
+    {
+      "purok": 3,
+      "x": 172.7,
+      "y": 47.7
+    },
+    {
+      "purok": 4,
+      "x": 307.7,
+      "y": 62.9
+    },
+    {
+      "purok": 5,
+      "x": 87.9,
+      "y": 115.2
+    },
+    {
+      "purok": 6,
+      "x": 182.5,
+      "y": 131.6
+    },
+    {
+      "purok": 7,
+      "x": 224.3,
+      "y": 115.5
+    },
+    {
+      "purok": 8,
+      "x": 344.3,
+      "y": 112.5
+    },
+    {
+      "purok": 9,
+      "x": 80.5,
+      "y": 159
+    },
+    {
+      "purok": 10,
+      "x": 172.7,
+      "y": 196.2
+    },
+    {
+      "purok": 11,
+      "x": 210.2,
+      "y": 170.3
+    },
+    {
+      "purok": 12,
+      "x": 288,
+      "y": 135.6
+    }
+  ],
+  "walkMeters": {
+    "1": {
+      "center-a": 1770,
+      "center-b": 510,
+      "center-c": 490
+    },
+    "2": {
+      "center-a": 1090,
+      "center-b": 1600,
+      "center-c": 660
+    },
+    "3": {
+      "center-a": 1550,
+      "center-b": 950,
+      "center-c": 270
+    },
+    "4": {
+      "center-a": 690,
+      "center-b": 2820,
+      "center-c": 1890
+    },
+    "5": {
+      "center-a": 2160,
+      "center-b": 160,
+      "center-c": 880
+    },
+    "6": {
+      "center-a": 890,
+      "center-b": 1470,
+      "center-c": 540
+    },
+    "7": {
+      "center-a": 1260,
+      "center-b": 1660,
+      "center-c": 720
+    },
+    "8": {
+      "center-a": 580,
+      "center-b": 2720,
+      "center-c": 1780
+    },
+    "9": {
+      "center-a": 2040,
+      "center-b": 280,
+      "center-c": 1210
+    },
+    "10": {
+      "center-a": 1180,
+      "center-b": 1120,
+      "center-c": 1020
+    },
+    "11": {
+      "center-a": 760,
+      "center-b": 1530,
+      "center-c": 960
+    },
+    "12": {
+      "center-a": 140,
+      "center-b": 2360,
+      "center-c": 1420
+    }
+  }
+}

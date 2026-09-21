@@ -1,0 +1,12 @@
+{
+  "barangay": "Nangka, Marikina City",
+  "osmRelation": 371370,
+  "padMeters": 100,
+  "mapWidthUnits": 400,
+  "purokCount": 12,
+  "seed": 20260921,
+  "minCenterSeparationMeters": 450,
+  "maxSnapMeters": 80,
+  "centerOsmIds": ["way/446778587", "node/12030241370", "way/432783339"],
+  "geometryBudgetBytes": 250000
+}

@@ -99,6 +99,7 @@ Named deliberately rather than discovered later.
 - **Parametric means imprecise by design.** Payout is by location and threshold, not verified damage. Some households get money who weren't badly hit; the worst-hit get the same flat amount. That's the accepted trade — speed bought with precision.
 - **Wallet onboarding is unsolved at scale.** For now, payouts route to a barangay relief account under multisig rather than to 200 individual households.
 - **Regulatory.** 433 MHz and 868 MHz are not licence-free in the Philippines. This uses 915–918 MHz (AS923-3) under NTC MC 03-05-2007 as amended.
+- **The evacuation map is a demo snapshot.** Roads, waterways and the barangay outline of Nangka, Marikina City are real, © OpenStreetMap contributors (ODbL), baked into the app so the map works with no connection; regenerate with `pnpm --filter @ligtas/pwa map:build`. The purok positions are a generated demo layout and the evacuation centers are places OpenStreetMap names, not LGU-confirmed. Walking routes are the usual best route and can't know which roads are flooded.
 
 ---
 

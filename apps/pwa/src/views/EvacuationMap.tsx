@@ -1,35 +1,46 @@
-import { Severity } from '@ligtas/core'
+import { useEffect, useState } from 'react'
 import type { EvaluatedAlert } from '../lib/evaluateBundle'
 import { latestRelevantAlert } from '../lib/evaluateBundle'
+import { alertLevel } from '../lib/instructions'
 import {
-  CENTER_POSITIONS,
-  MAP_GRID,
+  MAP_CENTERS,
+  MAP_META,
+  PUROK_ANCHORS,
   centerDistancesFor,
-  connectorPathFor,
   formatWalkTime,
-  purokZoneCenter,
+  loadMapGeometry,
+  routeKeyFor,
+  purokAnchorFor,
+  type MapGeometry,
 } from '../lib/evacuationCenters'
 
-function purokZoneRect(purok: number) {
-  const i = purok - 1
-  const col = i % MAP_GRID.cols
-  const row = Math.floor(i / MAP_GRID.cols)
-  const pad = 6
-  return {
-    x: MAP_GRID.originX + col * MAP_GRID.zoneW + pad,
-    y: MAP_GRID.originY + row * MAP_GRID.zoneH + pad,
-    width: MAP_GRID.zoneW - pad * 2,
-    height: MAP_GRID.zoneH - pad * 2,
-  }
-}
+const [VIEW_W, VIEW_H] = MAP_META.viewBox
 
-const ALL_PUROKS = Array.from({ length: MAP_GRID.cols * MAP_GRID.rows }, (_, i) => i + 1)
+// A center's label goes wherever it covers no purok marker: with real
+// coordinates a center can sit right beside a purok (the School pin is ~17
+// units from purok 12), and a label drawn over a marker hides that purok.
+const LABEL_SLOTS = [
+  { dx: 10, dy: 3.5, anchor: 'start' },
+  { dx: -10, dy: 3.5, anchor: 'end' },
+  { dx: 0, dy: -10, anchor: 'middle' },
+  { dx: 0, dy: 17, anchor: 'middle' },
+] as const
 
-const EVACUATION_CENTER_SHORT_LABEL: Record<string, string> = {
-  'center-a': 'School',
-  'center-b': 'Hall',
-  'center-c': 'Court',
-}
+const CENTER_LABEL_SLOT = new Map(
+  MAP_CENTERS.map((c) => {
+    const width = c.short.length * 5.4
+    const scored = LABEL_SLOTS.map((slot) => {
+      const x0 = slot.anchor === 'start' ? c.x + slot.dx : slot.anchor === 'end' ? c.x + slot.dx - width : c.x + slot.dx - width / 2
+      const box = { x0, x1: x0 + width, y0: c.y + slot.dy - 8, y1: c.y + slot.dy + 2 }
+      const covered = PUROK_ANCHORS.filter(
+        (a) => a.x > box.x0 - 8 && a.x < box.x1 + 8 && a.y > box.y0 - 8 && a.y < box.y1 + 8,
+      ).length
+      const offMap = box.x0 < 0 || box.x1 > VIEW_W || box.y0 < 0 || box.y1 > VIEW_H
+      return { slot, cost: covered + (offMap ? 10 : 0) }
+    })
+    return [c.id, scored.reduce((best, s) => (s.cost < best.cost ? s : best)).slot]
+  }),
+)
 
 /**
  * Always-visible reference map (not gated behind an active alert) so a
@@ -38,18 +49,33 @@ const EVACUATION_CENTER_SHORT_LABEL: Record<string, string> = {
  * their own purok via the same latestRelevantAlert InstructionCard uses, so
  * the two surfaces can't disagree about what's currently active.
  *
- * "Nearest" is computed from real map coordinates (centerDistancesFor),
- * not a hand-maintained purok->center table -- a fixed table silently went
- * stale the first time the pins moved, since geometric proximity and a
- * manually authored grouping have no reason to stay in sync.
+ * The map is a real, fixed, offline snapshot of one barangay's roads (see
+ * lib/evacuationCenters.ts). Both the "nearest" center and the drawn dotted
+ * route come from the same precomputed walking routes, so what is drawn and
+ * what the distance says can't drift apart. The road geometry loads as its
+ * own precached chunk; the header and distance list render without it.
  */
 export function EvacuationMap({ purok, alerts }: { purok: number; alerts: EvaluatedAlert[] | null }) {
   const distances = centerDistancesFor(purok)
   const nearest = distances[0]
   const latest = alerts ? latestRelevantAlert(alerts, purok) : undefined
-  const urgent = latest !== undefined && latest.body !== undefined && latest.body.severity >= Severity.TIER_3
+  const urgent = latest?.body !== undefined && alertLevel(latest.body.severity) === 'evacuate'
 
-  const routePath = connectorPathFor(purok, nearest.center.id)
+  const [geometry, setGeometry] = useState<MapGeometry | null>(null)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let live = true
+    loadMapGeometry()
+      .then((g) => {
+        if (live) setGeometry(g)
+      })
+      .catch(() => {
+        if (live) setFailed(true)
+      })
+    return () => {
+      live = false
+    }
+  }, [])
 
   return (
     <div className={`mb-6 rounded-lg border p-4 ${urgent ? 'border-danger bg-danger-bg' : 'border-border bg-surface'}`}>
@@ -72,88 +98,178 @@ export function EvacuationMap({ purok, alerts }: { purok: number; alerts: Evalua
 
       <ul className="mb-3 space-y-1 text-xs">
         {distances.map(({ center, meters }) => (
-          <li key={center.id} className="flex items-center justify-between">
+          <li key={center.id} className="flex items-center justify-between gap-3">
             <span className={center.id === nearest.center.id ? 'font-semibold text-ink' : 'text-ink-2'}>
               {center.name}
             </span>
-            <span className="text-ink-3">{formatWalkTime(meters)}</span>
+            <span className="whitespace-nowrap text-ink-3">{formatWalkTime(meters)}</span>
           </li>
         ))}
       </ul>
 
-      <svg
-        viewBox="0 0 400 300"
-        className="w-full rounded bg-bg-alt/50"
-        role="img"
-        aria-label={`Map showing purok ${purok} and its nearest evacuation center, ${nearest.center.name}, ${formatWalkTime(nearest.meters)} away`}
-      >
-        <path
-          d="M -10 260 C 100 220, 180 280, 260 230 S 400 190, 420 200"
-          fill="none"
-          stroke="var(--color-info)"
-          strokeOpacity={0.2}
-          strokeWidth={26}
-          strokeLinecap="round"
-        />
+      {geometry ? (
+        <MapSvg geometry={geometry} purok={purok} nearestId={nearest.center.id} urgent={urgent} />
+      ) : (
+        <div
+          className="flex w-full items-center justify-center rounded bg-bg-alt/50 text-xs text-ink-2"
+          style={{ aspectRatio: `${VIEW_W} / ${VIEW_H}` }}
+        >
+          {failed ? 'Map unavailable. The list above still works.' : 'Loading map…'}
+        </div>
+      )}
 
-        {ALL_PUROKS.map((p) => {
-          const rect = purokZoneRect(p)
-          const isMine = p === purok
-          return (
-            <rect
-              key={p}
-              x={rect.x}
-              y={rect.y}
-              width={rect.width}
-              height={rect.height}
-              rx={6}
+      <p className="mt-2 text-xs text-ink-2">
+        Usual walking route. Roads may be flooded; follow barangay officials.
+      </p>
+      <p className="mt-1 text-xs text-ink-2">
+        © {MAP_META.source.replace(' (ODbL)', '')} ({MAP_META.snapshotDate}). Demo layout, not official.
+      </p>
+    </div>
+  )
+}
+
+function MapSvg({
+  geometry,
+  purok,
+  nearestId,
+  urgent,
+}: {
+  geometry: MapGeometry
+  purok: number
+  nearestId: string
+  urgent: boolean
+}) {
+  const nearest = MAP_CENTERS.find((c) => c.id === nearestId)!
+  const route = geometry.routes[routeKeyFor(purok)]?.[nearestId]
+  const mine = purokAnchorFor(purok)
+
+  return (
+    <svg
+      viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+      className="w-full rounded bg-bg-alt/50"
+      role="img"
+      aria-label={`Map of ${MAP_META.barangay} showing purok ${mine.purok} and its nearest evacuation center, ${nearest.name}`}
+    >
+      <path d={geometry.water.areas} fillRule="evenodd" className="fill-info/20" />
+      <path
+        d={geometry.water.river}
+        fill="none"
+        className="stroke-info/25"
+        strokeWidth={5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d={geometry.water.stream} fill="none" className="stroke-info/40" strokeWidth={1.4} strokeLinejoin="round" />
+
+      <path
+        d={geometry.roads.path}
+        fill="none"
+        className="stroke-ink-3/35"
+        strokeWidth={0.6}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path
+        d={geometry.roads.minor}
+        fill="none"
+        className="stroke-ink-3/50"
+        strokeWidth={1}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      <path
+        d={geometry.roads.major}
+        fill="none"
+        className="stroke-ink-3/80"
+        strokeWidth={1.9}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+
+      {/* Veil everything outside the barangay boundary, then outline the boundary itself. */}
+      <path
+        d={`M-10 -10H${VIEW_W + 10}V${VIEW_H + 10}H-10Z${geometry.boundary}`}
+        fillRule="evenodd"
+        className="fill-bg-alt/70"
+      />
+      <path d={geometry.boundary} fill="none" className="stroke-ink-3" strokeWidth={1} strokeDasharray="5 3" />
+
+      {route && (
+        <>
+          <path
+            d={route}
+            fill="none"
+            className="stroke-bg"
+            strokeWidth={urgent ? 5.5 : 4.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+          <path
+            d={route}
+            fill="none"
+            className={urgent ? 'stroke-danger' : 'stroke-info'}
+            strokeWidth={urgent ? 3 : 2.2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            strokeDasharray={urgent ? '0.1 5' : '6 4'}
+          />
+        </>
+      )}
+
+      {PUROK_ANCHORS.map((a) => {
+        const isMine = a.purok === mine.purok
+        return (
+          <g key={a.purok}>
+            <circle
+              cx={a.x}
+              cy={a.y}
+              r={isMine ? 8 : 5.5}
               className={
                 isMine
                   ? urgent
-                    ? 'fill-danger-bg stroke-danger'
-                    : 'fill-bg-alt stroke-info'
-                  : 'fill-surface stroke-border'
+                    ? 'fill-danger-deep stroke-bg'
+                    : 'fill-info stroke-bg'
+                  : 'fill-surface stroke-ink-3'
               }
-              strokeWidth={isMine ? 2.5 : 1}
+              strokeWidth={isMine ? 1.5 : 0.8}
             />
-          )
-        })}
-        {ALL_PUROKS.map((p) => {
-          const c = purokZoneCenter(p)
-          return (
-            <text key={p} x={c.x} y={c.y + 4} textAnchor="middle" className="fill-ink-3 text-[10px]">
-              {p}
+            <text
+              x={a.x}
+              y={a.y + (isMine ? 3.6 : 2.8)}
+              textAnchor="middle"
+              className={isMine ? 'fill-white text-[10px] font-bold' : 'fill-ink-2 text-[8px] font-semibold'}
+            >
+              {a.purok}
             </text>
-          )
-        })}
+          </g>
+        )
+      })}
 
-        <path
-          d={routePath}
-          fill="none"
-          className={urgent ? 'stroke-danger' : 'stroke-info'}
-          strokeWidth={urgent ? 2.5 : 1.5}
-          strokeLinejoin="round"
-          strokeDasharray={urgent ? '2 4' : '4 3'}
-        />
-
-        {Object.entries(CENTER_POSITIONS).map(([id, pos]) => {
-          const isNearest = id === nearest.center.id
-          const labelDx = pos.labelAnchor === 'start' ? 10 : pos.labelAnchor === 'end' ? -10 : 0
-          return (
-            <g key={id}>
-              <circle
-                cx={pos.x}
-                cy={pos.y}
-                r={isNearest ? 7 : 5}
-                className={isNearest ? (urgent ? 'fill-danger animate-pulse' : 'fill-info') : 'fill-ink-3'}
-              />
-              <text x={pos.x + labelDx} y={pos.y + 4} textAnchor={pos.labelAnchor} className="fill-ink-3 text-[9px]">
-                {EVACUATION_CENTER_SHORT_LABEL[id]}
-              </text>
-            </g>
-          )
-        })}
-      </svg>
-    </div>
+      {MAP_CENTERS.map((c) => {
+        const isNearest = c.id === nearestId
+        const slot = CENTER_LABEL_SLOT.get(c.id)!
+        return (
+          <g key={c.id}>
+            <circle
+              cx={c.x}
+              cy={c.y}
+              r={isNearest ? 7 : 5}
+              className={`stroke-bg ${isNearest ? (urgent ? 'fill-danger animate-pulse' : 'fill-info') : 'fill-ink-2'}`}
+              strokeWidth={1.5}
+            />
+            <text
+              x={c.x + slot.dx}
+              y={c.y + slot.dy}
+              textAnchor={slot.anchor}
+              className="fill-ink stroke-bg text-[9px] font-semibold"
+              strokeWidth={3}
+              style={{ paintOrder: 'stroke' }}
+            >
+              {c.short}
+            </text>
+          </g>
+        )
+      })}
+    </svg>
   )
 }
