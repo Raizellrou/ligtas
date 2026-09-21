@@ -19,6 +19,8 @@ export interface UseHouseholdCheckin {
   join(joinCode: string, displayName: string): Promise<'ok' | 'not_found' | 'unreachable'>
   leave(): void
   roster: MemberCheckin[] | null
+  /** When the hub last confirmed `roster` (ms); null until the first successful fetch. */
+  rosterAt: number | null
   stellarAddress: string | null
   pendingCount: number
   offline: boolean
@@ -31,6 +33,14 @@ export function useHouseholdCheckin(): UseHouseholdCheckin {
   const [stellarAddress, setStellarAddress] = useState<string | null>(null)
   const [pendingCount, setPendingCount] = useState(0)
   const [offline, setOffline] = useState(false)
+  // When the roster on screen was last confirmed by the hub (ms). While the
+  // hub is unreachable the roster stays up as "last known", and this is how old.
+  const [rosterAt, setRosterAt] = useState<number | null>(null)
+
+  const applyRoster = useCallback((members: MemberCheckin[]) => {
+    setRoster(members)
+    setRosterAt(Date.now())
+  }, [])
 
   const refreshPendingCount = useCallback(async (id: string) => {
     const queued = await listQueuedCheckins()
@@ -38,11 +48,11 @@ export function useHouseholdCheckin(): UseHouseholdCheckin {
   }, [])
 
   const drainQueue = useCallback((id: string) => {
-    inFlight ??= runDrain(id, setRoster, setOffline, () => refreshPendingCount(id)).finally(() => {
+    inFlight ??= runDrain(id, applyRoster, setOffline, () => refreshPendingCount(id)).finally(() => {
       inFlight = null
     })
     return inFlight
-  }, [refreshPendingCount])
+  }, [applyRoster, refreshPendingCount])
 
   const refreshRoster = useCallback(async (id: string, cancelledRef: { current: boolean }) => {
     const result = await fetchHouseholdStatus(id)
@@ -50,11 +60,11 @@ export function useHouseholdCheckin(): UseHouseholdCheckin {
     if (result === 'unreachable') {
       setOffline(true)
     } else {
-      setRoster(result.members)
+      applyRoster(result.members)
       setStellarAddress(result.stellarAddress ?? null)
       setOffline(false)
     }
-  }, [])
+  }, [applyRoster])
 
   useEffect(() => {
     if (!householdId) return
@@ -91,6 +101,7 @@ export function useHouseholdCheckin(): UseHouseholdCheckin {
   function leave() {
     clearIdentity()
     setRoster(null)
+    setRosterAt(null)
     setStellarAddress(null)
     setPendingCount(0)
     setOffline(false)
@@ -114,6 +125,7 @@ export function useHouseholdCheckin(): UseHouseholdCheckin {
     join,
     leave,
     roster,
+    rosterAt,
     stellarAddress,
     pendingCount,
     offline,

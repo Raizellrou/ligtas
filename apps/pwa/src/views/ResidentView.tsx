@@ -1,9 +1,18 @@
 import { useState, type FormEvent } from 'react'
 import { activeEvacuation } from '../lib/activeEvacuation'
 import { latestRelevantAlert, type EvaluatedAlert } from '../lib/evaluateBundle'
+import {
+  ALERT_OLD_AFTER_S,
+  CHECK_STALE_AFTER_S,
+  ageSeconds,
+  isStale,
+  sinceLabel,
+  whenLabel,
+} from '../lib/freshness'
 import { alertLevel, instructionFor, severityLabel } from '../lib/instructions'
 import { useEvacuationRoute } from '../lib/useEvacuationRoute'
 import type { LiveLocation, LivePosition } from '../lib/useLiveLocation'
+import { useNow } from '../lib/useNow'
 import { usePersistedPurok } from '../usePersistedPurok'
 import { useDismissedAlert } from '../useDismissedAlert'
 import { useJoinSkipped } from '../useJoinSkipped'
@@ -39,14 +48,18 @@ export function ResidentView({
   checkin,
   liveLocation,
   offline,
+  checkedAt,
 }: {
   alerts: EvaluatedAlert[] | null
   capturedCount: number
   checkin: UseHouseholdCheckin
   liveLocation: LiveLocation
   offline: boolean
+  /** When this device last got the alert list (ms), or null before the first check. */
+  checkedAt: number | null
 }) {
   const { purok, setPurok, clearPurok } = usePersistedPurok()
+  const now = useNow()
   // Relief only ever shows once this purok actually has a live alert
   // against it -- a household's address can hold an old/unrelated
   // claimable balance (e.g. from a past drill), and showing that here
@@ -73,6 +86,7 @@ export function ResidentView({
         purok={purok}
         checkin={checkin}
         position={liveLocation.position}
+        now={now}
         onContinue={() => {
           dismiss(evacuation.key)
           // "Show my route" must lead to the route. An unjoined resident
@@ -143,14 +157,17 @@ export function ResidentView({
         </div>
       </div>
 
-      {checkin.joined ? <HouseholdCheckin {...checkin} /> : <JoinPrompt onJoin={() => setJoining(true)} />}
+      {checkin.joined ? <HouseholdCheckin {...checkin} now={now} /> : <JoinPrompt onJoin={() => setJoining(true)} />}
 
       <EvacuationMap purok={purok} alerts={alerts} liveLocation={liveLocation} />
 
       {alerts === null ? (
         <p className="text-ink-2">Loading alerts…</p>
       ) : (
-        <AlertList alerts={alerts} purok={purok} position={liveLocation.position} />
+        <>
+          <CheckedLine checkedAt={checkedAt} now={now} />
+          <AlertList alerts={alerts} purok={purok} position={liveLocation.position} now={now} />
+        </>
       )}
     </>
   )
@@ -317,12 +334,39 @@ function JoinStep({
   )
 }
 
-function AlertList({ alerts, purok, position }: { alerts: EvaluatedAlert[]; purok: number; position: LivePosition | null }) {
+// Says how recent "no alert" (or any alert) actually is. Quiet when the phone
+// has checked recently; a warning when it has not, because "your purok is not
+// affected" from a phone that has been out of touch for hours is not a
+// reassurance and must not read like one.
+function CheckedLine({ checkedAt, now }: { checkedAt: number | null; now: number }) {
+  if (checkedAt === null) return null
+  if (isStale(ageSeconds(checkedAt, now), CHECK_STALE_AFTER_S)) {
+    return (
+      <p className="mb-2 rounded border border-accent bg-accent-bg p-2 text-sm text-ink">
+        <span className="font-semibold">Last checked {sinceLabel(checkedAt, now)}.</span> This phone may have missed
+        newer alerts. Follow the siren and barangay officials.
+      </p>
+    )
+  }
+  return <p className="mb-2 text-xs text-ink-2">Alerts checked {sinceLabel(checkedAt, now)}</p>
+}
+
+function AlertList({
+  alerts,
+  purok,
+  position,
+  now,
+}: {
+  alerts: EvaluatedAlert[]
+  purok: number
+  position: LivePosition | null
+  now: number
+}) {
   const accepted = alerts.filter((a) => a.outcome === 'accepted' && a.body)
   const latest = latestRelevantAlert(alerts, purok)
 
   return latest ? (
-    <InstructionCard alert={latest} purok={purok} position={position} />
+    <InstructionCard alert={latest} purok={purok} position={position} now={now} />
   ) : accepted.length > 0 ? (
     <div className="mb-6 rounded border border-border bg-surface p-4">
       <p className="text-ink-2">Your purok is not affected by any current alert.</p>
@@ -337,17 +381,38 @@ function AlertList({ alerts, purok, position }: { alerts: EvaluatedAlert[]; puro
 // Tier decides how loud the card is: only an evacuation is red, a "prepare"
 // is marigold, and a "watch" is a quiet info note -- so red keeps meaning
 // "go now". Tier 3 names the same nearest center the map and the takeover do.
-function InstructionCard({ alert, purok, position }: { alert: EvaluatedAlert; purok: number; position: LivePosition | null }) {
+function InstructionCard({
+  alert,
+  purok,
+  position,
+  now,
+}: {
+  alert: EvaluatedAlert
+  purok: number
+  position: LivePosition | null
+  now: number
+}) {
   const body = alert.body!
   const level = alertLevel(body.severity)
   const route = useEvacuationRoute({ purok, severity: body.severity, position })
   const text = instructionFor(body, level === 'evacuate' ? route.nearest.center.name : undefined)
 
+  // issuedAt is unix seconds; the freshness helpers take milliseconds. It is
+  // signed by the issuer but only ever DISPLAYED here -- never used to accept,
+  // reject or order alerts (PRD 5.4).
+  const issuedMs = body.issuedAt * 1000
+  const issued = <p className="mb-2 text-xs text-ink-2">Issued {whenLabel(issuedMs, now)}</p>
+  const old = isStale(ageSeconds(issuedMs, now), ALERT_OLD_AFTER_S) && (
+    <p className="mt-2 text-sm font-semibold text-ink">This alert is old. Ask barangay officials if it still applies.</p>
+  )
+
   if (level === 'watch') {
     return (
       <div className="mb-6 rounded-lg border border-info bg-info-bg p-4">
         <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-2">{severityLabel(body.severity)} · Watch</p>
+        {issued}
         <p className="text-sm text-ink-2">{text}</p>
+        {old}
       </div>
     )
   }
@@ -357,7 +422,9 @@ function InstructionCard({ alert, purok, position }: { alert: EvaluatedAlert; pu
   return (
     <div className={`mb-6 rounded-lg border p-4 ${box}`}>
       <p className={`mb-1 text-xs font-semibold uppercase tracking-wide ${eyebrow}`}>{severityLabel(body.severity)} alert</p>
+      {issued}
       <p className="font-display text-lg font-semibold text-ink">{text}</p>
+      {old}
     </div>
   )
 }

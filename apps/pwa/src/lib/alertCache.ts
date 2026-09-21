@@ -2,10 +2,16 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import type { AlertBundle } from '@ligtas/core'
 import type { QueuedCheckin } from './checkinQueue'
 
+/** A bundle plus when THIS device fetched it (ms). Older installs stored the bare bundle; see loadCachedBundle. */
+export interface CachedBundle {
+  bundle: AlertBundle
+  fetchedAt: number
+}
+
 interface LigtasDB extends DBSchema {
   bundle: {
     key: 'latest'
-    value: AlertBundle
+    value: CachedBundle | AlertBundle
   }
   checkinQueue: {
     key: string
@@ -42,13 +48,17 @@ export { CHECKIN_QUEUE_STORE }
  * here -- tester broadcasts already persist in localStorage, and those
  * aren't a "received" alert this cache needs to survive for.
  */
-export async function cacheBundle(bundle: AlertBundle): Promise<void> {
+export async function cacheBundle(bundle: AlertBundle, fetchedAt: number): Promise<void> {
   const db = await getDB()
-  await db.put(STORE_NAME, bundle, LATEST_KEY)
+  await db.put(STORE_NAME, { bundle, fetchedAt }, LATEST_KEY)
 }
 
-export async function loadCachedBundle(): Promise<AlertBundle | null> {
+export async function loadCachedBundle(): Promise<CachedBundle | null> {
   const db = await getDB()
-  const bundle = await db.get(STORE_NAME, LATEST_KEY)
-  return bundle ?? null
+  const stored = await db.get(STORE_NAME, LATEST_KEY)
+  if (stored === undefined) return null
+  if ('bundle' in stored) return stored
+  // Stored by an earlier build, before fetch time was recorded: the bundle's
+  // own export time is the best (and an honest, older) stand-in.
+  return { bundle: stored, fetchedAt: stored.generatedAt * 1000 }
 }

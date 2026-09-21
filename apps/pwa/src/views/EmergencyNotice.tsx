@@ -4,6 +4,7 @@ import type { AlertBody } from '@ligtas/core'
 import { stopVibration, vibrateEmergency } from '../lib/alertFeedback'
 import type { CheckinStatus } from '../lib/checkinQueue'
 import { formatWalkTime, walkMinutes } from '../lib/evacuationCenters'
+import { ALERT_OLD_AFTER_S, ageSeconds, isStale, whenLabel } from '../lib/freshness'
 import { hazardLabel } from '../lib/instructions'
 import { useEvacuationRoute } from '../lib/useEvacuationRoute'
 import type { UseHouseholdCheckin } from '../lib/useHouseholdCheckin'
@@ -32,12 +33,14 @@ export function EmergencyNotice({
   purok,
   checkin,
   position,
+  now,
   onContinue,
 }: {
   body: AlertBody
   purok: number
   checkin: UseHouseholdCheckin
   position: LivePosition | null
+  now: number
   onContinue: () => void
 }) {
   const puroks = affectedPuroks(body.purokBitmap)
@@ -82,6 +85,11 @@ export function EmergencyNotice({
         </h1>
         <p className="mt-1 text-sm text-ink-2">
           Affects {puroks.map((p) => `Purok ${p}`).join(', ')}
+        </p>
+        {/* issuedAt is unix seconds. Display only -- an old evacuation still takes over the screen. */}
+        <p className="mt-1 text-sm text-ink-2">
+          Issued {whenLabel(body.issuedAt * 1000, now)}
+          {isStale(ageSeconds(body.issuedAt * 1000, now), ALERT_OLD_AFTER_S) && ' — this alert is old. Ask barangay officials if it still applies.'}
         </p>
 
         <div className="mt-6 w-full max-w-xs rounded-lg border border-danger bg-danger-bg p-4 text-left">

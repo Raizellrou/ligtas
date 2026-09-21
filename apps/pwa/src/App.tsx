@@ -2,7 +2,10 @@ import { useState } from 'react'
 import { useSimulation } from './lib/useSimulation'
 import { useHouseholdCheckin } from './lib/useHouseholdCheckin'
 import { activeEvacuation } from './lib/activeEvacuation'
+import { sinceLabel } from './lib/freshness'
 import { useLiveLocation } from './lib/useLiveLocation'
+import { useNow } from './lib/useNow'
+import { useOnline } from './lib/useOnline'
 import { readDismissedAlert } from './useDismissedAlert'
 import { readPersistedPurok } from './usePersistedPurok'
 import { ResidentView } from './views/ResidentView'
@@ -34,6 +37,11 @@ function App() {
   // Lives here, not in a view: a running walk simulation must survive the
   // resident switching to the Tester tab to raise the river.
   const liveLocation = useLiveLocation()
+  const now = useNow()
+  // Out of touch if the page could not load fresh alerts OR the browser has
+  // since lost its network -- sim.offline alone only reflects the moment of load.
+  const online = useOnline()
+  const offline = sim.offline || !online
 
   function setRole(next: Role) {
     localStorage.setItem(ROLE_STORAGE_KEY, next)
@@ -93,9 +101,10 @@ function App() {
 
         {sim.error && <p className="mb-4 text-sm text-danger">Failed to load alerts: {sim.error}</p>}
 
-        {sim.offline && role !== 'how' && (
+        {offline && role !== 'how' && (
           <p className="mb-4 rounded border border-info bg-info-bg p-2 text-xs text-info">
-            Offline — showing the last alerts this device received.
+            Offline — showing the last alerts this device received
+            {sim.checkedAt !== null && <> (checked {sinceLabel(sim.checkedAt, now)})</>}.
           </p>
         )}
 
@@ -117,7 +126,8 @@ function App() {
             capturedCount={sim.capturedCount}
             checkin={checkin}
             liveLocation={liveLocation}
-            offline={sim.offline}
+            offline={offline}
+            checkedAt={sim.checkedAt}
           />
         )}
         {role === 'tester' && <TesterView sim={sim} liveLocation={liveLocation} />}

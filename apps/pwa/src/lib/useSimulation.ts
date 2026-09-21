@@ -34,6 +34,8 @@ export interface Simulation {
   capturedCount: number
   /** True when the network fetch failed and this is the last idb-cached bundle instead. */
   offline: boolean
+  /** When this device last got the alert list (ms): now on a successful fetch, the stored fetch time when offline. */
+  checkedAt: number | null
   testerPublicKey: string
   broadcast: (kind: Exclude<BroadcastKind, 'replay-exact'>, options: BroadcastOptions) => void
   replayExact: (index: number) => void
@@ -53,36 +55,58 @@ export function useSimulation(): Simulation {
   const [broadcasts, setBroadcasts] = useState<AlertBundleEntry[]>(loadStoredBroadcasts)
   const [error, setError] = useState<string | null>(null)
   const [offline, setOffline] = useState(false)
+  const [checkedAt, setCheckedAt] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
-    fetch('/alert-bundle.json')
-      .then((r) => {
-        if (!r.ok) throw new Error(`fetch failed: ${r.status}`)
-        return r.json() as Promise<AlertBundle>
-      })
-      .then((b) => {
-        if (cancelled) return
-        setCaptured(b)
-        setOffline(false)
-        void cacheBundle(b)
-      })
-      .catch((fetchError: unknown) => {
-        // No network (or no hub reachable): fall back to the last bundle
-        // this device actually received, rather than an empty screen.
-        void loadCachedBundle().then((cached) => {
-          if (cancelled) return
-          if (cached !== null) {
-            setCaptured(cached)
-            setOffline(true)
-            setError(null)
-          } else {
-            setError(String(fetchError))
-          }
+
+    // The query string is deliberate. The service worker precaches
+    // /alert-bundle.json, so a bare fetch "succeeds" from that cache with no
+    // network at all, and an offline phone would look freshly updated. A URL
+    // the service worker doesn't know goes to the real network, and fails when
+    // there isn't one -- which is what tells us the phone is out of touch.
+    function load(initial: boolean) {
+      fetch(`/alert-bundle.json?t=${Date.now()}`, { cache: 'no-store' })
+        .then((r) => {
+          if (!r.ok) throw new Error(`fetch failed: ${r.status}`)
+          return r.json() as Promise<AlertBundle>
         })
-      })
+        .then((b) => {
+          if (cancelled) return
+          const at = Date.now()
+          setCaptured(b)
+          setOffline(false)
+          setError(null)
+          setCheckedAt(at)
+          void cacheBundle(b, at)
+        })
+        .catch((fetchError: unknown) => {
+          // A failed re-check keeps what is already on screen.
+          if (!initial) return
+          // No network (or no hub reachable): fall back to the last bundle
+          // this device actually received, rather than an empty screen.
+          void loadCachedBundle().then((cached) => {
+            if (cancelled) return
+            if (cached !== null) {
+              setCaptured(cached.bundle)
+              setCheckedAt(cached.fetchedAt)
+              setOffline(true)
+              setError(null)
+            } else {
+              setError(String(fetchError))
+            }
+          })
+        })
+    }
+
+    load(true)
+    // Coming back online is the moment to look again; without this the
+    // "offline" state set at load would never clear.
+    const onOnline = () => load(false)
+    window.addEventListener('online', onOnline)
     return () => {
       cancelled = true
+      window.removeEventListener('online', onOnline)
     }
   }, [])
 
@@ -137,6 +161,7 @@ export function useSimulation(): Simulation {
     evaluated,
     capturedCount: captured?.alerts.length ?? 0,
     offline,
+    checkedAt,
     testerPublicKey: issuer.publicKey(),
     broadcast,
     replayExact,

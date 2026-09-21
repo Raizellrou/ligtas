@@ -1,3 +1,4 @@
+import { sinceLabel } from '../lib/freshness'
 import type { UseHouseholdCheckin } from '../lib/useHouseholdCheckin'
 
 const STATUS_LABEL: Record<'safe' | 'need_help', string> = {
@@ -27,11 +28,20 @@ function HelpIcon() {
   )
 }
 
-export function HouseholdCheckin(props: UseHouseholdCheckin) {
+export function HouseholdCheckin(props: UseHouseholdCheckin & { now: number }) {
   return <StatusPanel {...props} />
 }
 
-function StatusPanel({ displayName, roster, pendingCount, submit, leave }: UseHouseholdCheckin) {
+function StatusPanel({
+  displayName,
+  roster,
+  rosterAt,
+  offline,
+  pendingCount,
+  submit,
+  leave,
+  now,
+}: UseHouseholdCheckin & { now: number }) {
   return (
     <div className="mb-6 rounded-lg border border-border bg-surface p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -66,6 +76,13 @@ function StatusPanel({ displayName, roster, pendingCount, submit, leave }: UseHo
         </p>
       )}
 
+      {offline && roster !== null && (
+        <p className="mb-3 rounded border border-info bg-info-bg p-2 text-xs text-info">
+          Can't reach the hub. Showing what was last known
+          {rosterAt !== null && <> (confirmed {sinceLabel(rosterAt, now)})</>}.
+        </p>
+      )}
+
       {roster === null ? (
         <p className="text-xs text-ink-3">Loading household status…</p>
       ) : roster.length === 0 ? (
@@ -77,9 +94,13 @@ function StatusPanel({ displayName, roster, pendingCount, submit, leave }: UseHo
               <span className={m.displayName === displayName ? 'font-semibold text-ink' : 'text-ink-2'}>
                 {m.displayName}
               </span>
-              <span className={`flex items-center gap-1 ${m.status === 'safe' ? 'text-success' : 'text-danger'}`}>
-                {m.status === 'safe' ? <CheckIcon /> : <HelpIcon />}
-                {STATUS_LABEL[m.status]}
+              <span className="flex items-center gap-2">
+                <span className={`flex items-center gap-1 ${m.status === 'safe' ? 'text-success' : 'text-danger'}`}>
+                  {m.status === 'safe' ? <CheckIcon /> : <HelpIcon />}
+                  {STATUS_LABEL[m.status]}
+                </span>
+                {/* updatedAt is when the hub recorded it, in ms -- a tap made offline reaches the hub later. */}
+                <span className="text-xs text-ink-2">{sinceLabel(m.updatedAt, now)}</span>
               </span>
             </li>
           ))}
