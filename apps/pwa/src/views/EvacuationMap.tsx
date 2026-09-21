@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { EvaluatedAlert } from '../lib/evaluateBundle'
 import { latestRelevantAlert } from '../lib/evaluateBundle'
 import { alertLevel } from '../lib/instructions'
@@ -18,24 +18,37 @@ import type { LiveLocation } from '../lib/useLiveLocation'
 
 const [VIEW_W, VIEW_H] = MAP_META.viewBox
 
+// Width in px of the map when enlarged (about twice a phone's width).
+const ENLARGED_WIDTH = 820
+
 // A center's label goes wherever it covers no purok marker: with real
 // coordinates a center can sit right beside a purok (the School pin is ~17
 // units from purok 12), and a label drawn over a marker hides that purok.
+//
+// Sizes are in SVG units and the map is drawn ~340 px wide for 400 units, so
+// 1 unit is under 1 px: text has to be ~11+ units to read on a phone.
 const LABEL_SLOTS = [
-  { dx: 10, dy: 3.5, anchor: 'start' },
-  { dx: -10, dy: 3.5, anchor: 'end' },
-  { dx: 0, dy: -10, anchor: 'middle' },
-  { dx: 0, dy: 17, anchor: 'middle' },
+  { dx: 12, dy: 4, anchor: 'start' },
+  { dx: -12, dy: 4, anchor: 'end' },
+  { dx: 0, dy: -12, anchor: 'middle' },
+  { dx: 0, dy: 20, anchor: 'middle' },
 ] as const
+
+const LABEL_CHAR_WIDTH = 6.8 // ~11.5-unit semibold text
+const MARKER_CLEARANCE = 10 // a purok marker's radius (own purok is larger)
 
 const CENTER_LABEL_SLOT = new Map(
   MAP_CENTERS.map((c) => {
-    const width = c.short.length * 5.4
+    const width = c.short.length * LABEL_CHAR_WIDTH
     const scored = LABEL_SLOTS.map((slot) => {
       const x0 = slot.anchor === 'start' ? c.x + slot.dx : slot.anchor === 'end' ? c.x + slot.dx - width : c.x + slot.dx - width / 2
-      const box = { x0, x1: x0 + width, y0: c.y + slot.dy - 8, y1: c.y + slot.dy + 2 }
+      const box = { x0, x1: x0 + width, y0: c.y + slot.dy - 10, y1: c.y + slot.dy + 3 }
       const covered = PUROK_ANCHORS.filter(
-        (a) => a.x > box.x0 - 8 && a.x < box.x1 + 8 && a.y > box.y0 - 8 && a.y < box.y1 + 8,
+        (a) =>
+          a.x > box.x0 - MARKER_CLEARANCE &&
+          a.x < box.x1 + MARKER_CLEARANCE &&
+          a.y > box.y0 - MARKER_CLEARANCE &&
+          a.y < box.y1 + MARKER_CLEARANCE,
       ).length
       const offMap = box.x0 < 0 || box.x1 > VIEW_W || box.y0 < 0 || box.y1 > VIEW_H
       return { slot, cost: covered + (offMap ? 10 : 0) }
@@ -89,6 +102,18 @@ export function EvacuationMap({
     }
   }, [])
 
+  // "Enlarge": the same map at twice the width in a sideways-scrolling box, so
+  // the labels can be read properly without a map library. Opens centred on
+  // the resident's own purok.
+  const [enlarged, setEnlarged] = useState(false)
+  const scroller = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const box = scroller.current
+    if (!enlarged || box === null) return
+    const focusX = (purokAnchorFor(purok).x / VIEW_W) * ENLARGED_WIDTH
+    box.scrollLeft = Math.max(0, focusX - box.clientWidth / 2)
+  }, [enlarged, purok, geometry])
+
   return (
     <div className={`mb-6 rounded-lg border p-4 ${urgent ? 'border-danger bg-danger-bg' : 'border-border bg-surface'}`}>
       <div className="mb-3">
@@ -106,18 +131,18 @@ export function EvacuationMap({
             {formatWalkTime(nearest.meters)}
           </span>
         </div>
-        {nearest.center.note && <p className="mt-1 text-xs text-ink-3">{nearest.center.note}</p>}
+        {nearest.center.note && <p className="mt-1 text-sm text-ink-2">{nearest.center.note}</p>}
       </div>
 
       <FloodNotice route={route} />
 
-      <ul className="mb-3 space-y-1 text-xs">
+      <ul className="mb-3 space-y-1 text-sm">
         {ranked.map(({ center, meters }) => (
           <li key={center.id} className="flex items-center justify-between gap-3">
             <span className={center.id === nearest.center.id ? 'font-semibold text-ink' : 'text-ink-2'}>
               {center.name}
             </span>
-            <span className="whitespace-nowrap text-ink-3">
+            <span className="whitespace-nowrap text-ink-2">
               {meters === null ? 'cut off by flooding' : formatWalkTime(meters)}
             </span>
           </li>
@@ -125,7 +150,18 @@ export function EvacuationMap({
       </ul>
 
       {geometry ? (
-        <MapSvg geometry={geometry} purok={purok} route={route} urgent={urgent} />
+        <>
+          <div ref={scroller} className={enlarged ? 'overflow-x-auto rounded' : undefined}>
+            <MapSvg geometry={geometry} purok={purok} route={route} urgent={urgent} enlarged={enlarged} />
+          </div>
+          <button
+            onClick={() => setEnlarged((e) => !e)}
+            aria-pressed={enlarged}
+            className="mt-2 rounded-lg border border-ink-3 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-bg-alt"
+          >
+            {enlarged ? 'Fit map to screen' : 'Enlarge map'}
+          </button>
+        </>
       ) : (
         <div
           className="flex w-full items-center justify-center rounded bg-bg-alt/50 text-xs text-ink-2"
@@ -159,13 +195,13 @@ function FloodNotice({ route }: { route: EvacuationRoute }) {
   if (route.blockingTier === 0) return null
   if (route.allFlooded) {
     return (
-      <p className="mb-3 rounded border border-danger bg-danger-bg px-2 py-1.5 text-xs font-semibold text-danger-deep">
+      <p className="mb-3 rounded border border-danger bg-danger-bg px-2 py-1.5 text-sm font-semibold text-danger-deep">
         Every known route from here may be flooded. The route shown ignores flooding. Follow barangay officials.
       </p>
     )
   }
   return (
-    <p className="mb-3 rounded border border-accent bg-accent-bg px-2 py-1.5 text-xs text-ink-2">
+    <p className="mb-3 rounded border border-accent bg-accent-bg px-2 py-1.5 text-sm text-ink-2">
       Avoiding streets likely flooded at Tier {route.blockingTier}
       {route.detourMeters !== null && ` (+${walkMinutes(route.detourMeters)} min)`}.
     </p>
@@ -175,7 +211,7 @@ function FloodNotice({ route }: { route: EvacuationRoute }) {
 function LocationControl({ liveLocation, outsideMap }: { liveLocation: LiveLocation; outsideMap: boolean }) {
   const { status, position, hint, simulation } = liveLocation
   const button =
-    'rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:bg-bg-alt'
+    'rounded-lg border border-ink-3 px-3 py-1.5 text-xs font-semibold text-ink hover:bg-bg-alt'
 
   return (
     <div className="mt-3 border-t border-border pt-3">
@@ -219,11 +255,13 @@ function MapSvg({
   purok,
   route,
   urgent,
+  enlarged,
 }: {
   geometry: MapGeometry
   purok: number
   route: EvacuationRoute
   urgent: boolean
+  enlarged: boolean
 }) {
   const nearestId = route.nearest.center.id
   const nearest = MAP_CENTERS.find((c) => c.id === nearestId)!
@@ -235,7 +273,8 @@ function MapSvg({
   return (
     <svg
       viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-      className="w-full rounded bg-bg-alt/50"
+      className="rounded bg-bg-alt/50"
+      style={enlarged ? { width: ENLARGED_WIDTH, maxWidth: 'none' } : { width: '100%' }}
       role="img"
       aria-label={`Map of ${MAP_META.barangay} showing purok ${mine.purok}${you ? ', your location' : ''} and its nearest evacuation center, ${nearest.name}`}
     >
@@ -323,15 +362,15 @@ function MapSvg({
             <circle
               cx={a.x}
               cy={a.y}
-              r={isMine ? 8 : 5.5}
+              r={isMine ? 10 : 7}
               className={isMine ? (urgent ? 'fill-danger-deep stroke-bg' : 'fill-ink stroke-bg') : 'fill-surface stroke-ink-3'}
-              strokeWidth={isMine ? 1.5 : 0.8}
+              strokeWidth={isMine ? 1.5 : 0.9}
             />
             <text
               x={a.x}
-              y={a.y + (isMine ? 3.6 : 2.8)}
+              y={a.y + (isMine ? 4.6 : 3.9)}
               textAnchor="middle"
-              className={isMine ? 'fill-white text-[10px] font-bold' : 'fill-ink-2 text-[8px] font-semibold'}
+              className={isMine ? 'fill-white text-[13px] font-bold' : 'fill-ink text-[11px] font-semibold'}
             >
               {a.purok}
             </text>
@@ -347,16 +386,16 @@ function MapSvg({
             <circle
               cx={c.x}
               cy={c.y}
-              r={isNearest ? 7 : 5}
-              className={`stroke-bg ${isNearest ? (urgent ? 'fill-danger animate-pulse' : 'fill-info') : 'fill-ink-2'}`}
+              r={isNearest ? 8.5 : 6}
+              className={`stroke-bg ${isNearest ? (urgent ? 'fill-danger animate-pulse motion-reduce:animate-none' : 'fill-info') : 'fill-ink-2'}`}
               strokeWidth={1.5}
             />
             <text
               x={c.x + slot.dx}
               y={c.y + slot.dy}
               textAnchor={slot.anchor}
-              className="fill-ink stroke-bg text-[9px] font-semibold"
-              strokeWidth={3}
+              className="fill-ink stroke-bg text-[11.5px] font-semibold"
+              strokeWidth={3.5}
               style={{ paintOrder: 'stroke' }}
             >
               {c.short}
@@ -368,7 +407,7 @@ function MapSvg({
       {you && (
         <g>
           <circle cx={you.x} cy={you.y} r={Math.min(40, Math.max(6, you.accuracyUnits))} className="fill-info/15 stroke-info/40" strokeWidth={0.8} />
-          <circle cx={you.x} cy={you.y} r={5} className="fill-info stroke-white" strokeWidth={2} />
+          <circle cx={you.x} cy={you.y} r={6.5} className="fill-info stroke-white" strokeWidth={2} />
         </g>
       )}
     </svg>

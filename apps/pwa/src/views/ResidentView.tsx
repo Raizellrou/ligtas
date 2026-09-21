@@ -175,7 +175,7 @@ function PurokPicker({ onSelect }: { onSelect: (p: number) => void }) {
             onClick={() => setSelected(p)}
             className={`relative aspect-square rounded-lg border font-semibold ${
               selected === p
-                ? 'border-accent bg-accent text-white'
+                ? 'border-accent bg-accent text-ink'
                 : 'border-border bg-surface text-ink hover:bg-bg-alt'
             }`}
           >
@@ -210,7 +210,7 @@ function PurokPicker({ onSelect }: { onSelect: (p: number) => void }) {
       <button
         onClick={() => selected !== null && onSelect(selected)}
         disabled={selected === null}
-        className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-deep disabled:cursor-not-allowed disabled:bg-bg-alt disabled:text-ink-3"
+        className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-ink hover:brightness-95 disabled:cursor-not-allowed disabled:bg-bg-alt disabled:text-ink-3"
       >
         {selected === null ? 'Select a purok to continue' : `Continue as Purok ${selected}`}
       </button>
@@ -279,13 +279,13 @@ function JoinStep({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Bob"
-          className="mb-3 w-full rounded border border-border bg-bg-alt px-2 py-1.5 text-sm text-ink placeholder:text-ink-3"
+          className="mb-3 w-full rounded border border-ink-3 bg-bg-alt px-2 py-1.5 text-sm text-ink placeholder:text-ink-3"
         />
 
         <button
           type="submit"
           disabled={!name.trim() || status === 'joining'}
-          className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-deep disabled:cursor-not-allowed disabled:bg-bg-alt disabled:text-ink-3"
+          className="w-full rounded-lg bg-accent py-3 text-sm font-semibold text-ink hover:brightness-95 disabled:cursor-not-allowed disabled:bg-bg-alt disabled:text-ink-3"
         >
           {status === 'joining' ? 'Joining…' : 'Continue'}
         </button>

@@ -73,7 +73,7 @@ function App() {
               </svg>
               <h1 className="font-display text-xl font-bold">Ligtas</h1>
             </div>
-            <span className="text-[10px] uppercase tracking-wide text-ink-3">Testnet demo</span>
+            <span className="text-xs uppercase tracking-wide text-ink-3">Testnet demo</span>
           </div>
           <nav className="flex gap-1 rounded-lg bg-surface border border-border p-1" aria-label="Role">
             {PRIMARY_ROLES.map((r) => (
@@ -82,7 +82,7 @@ function App() {
                 onClick={() => setRole(r.id)}
                 aria-current={role === r.id}
                 className={`flex-1 rounded px-3 py-2 text-sm font-medium transition-colors ${
-                  role === r.id ? 'bg-accent text-white' : 'text-ink-2 hover:text-ink'
+                  role === r.id ? 'bg-accent text-ink' : 'text-ink-2 hover:text-ink'
                 }`}
               >
                 {r.label}

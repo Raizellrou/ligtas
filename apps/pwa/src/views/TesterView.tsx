@@ -110,7 +110,7 @@ function WalkSimulator({ liveLocation, alerts }: { liveLocation: LiveLocation; a
                   onClick={() => liveLocation.setSimulationSpeed(s)}
                   aria-pressed={simulation.speed === s}
                   className={`rounded px-2 py-1 text-xs font-semibold ${
-                    simulation.speed === s ? 'bg-accent text-white' : 'bg-bg-alt text-ink-2 hover:bg-border'
+                    simulation.speed === s ? 'bg-accent text-ink' : 'bg-bg-alt text-ink-2 hover:bg-border'
                   }`}
                 >
                   ×{s}
@@ -253,7 +253,7 @@ export function TesterView({ sim, liveLocation }: { sim: Simulation; liveLocatio
                   type="button"
                   onClick={() => setPurokBitmap(purokBitmap ^ (1 << (p - 1)))}
                   className={`h-9 w-9 rounded text-sm font-semibold ${
-                    on ? 'bg-accent text-white' : 'bg-bg-alt text-ink-2 hover:bg-border'
+                    on ? 'bg-accent text-ink' : 'bg-bg-alt text-ink-2 hover:bg-border'
                   }`}
                   aria-pressed={on}
                 >
@@ -468,7 +468,7 @@ function TierBadge({ tier, levelCm }: { tier: number; levelCm: number }) {
       : tier === 1
         ? 'bg-accent-bg text-accent-deep'
         : tier === 2
-          ? 'bg-accent text-white'
+          ? 'bg-accent text-ink'
           : 'bg-danger text-white'
   return (
     <span className={`rounded px-2 py-1 text-xs font-semibold ${style}`}>

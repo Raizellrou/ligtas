@@ -80,7 +80,7 @@ export function EmergencyNotice({
         <h1 id="emergency-title" className="font-display text-3xl font-bold leading-tight text-ink">
           {hazardLabel(body.hazard)}
         </h1>
-        <p className="mt-1 text-xs text-ink-3">
+        <p className="mt-1 text-sm text-ink-2">
           Affects {puroks.map((p) => `Purok ${p}`).join(', ')}
         </p>
 
@@ -88,14 +88,14 @@ export function EmergencyNotice({
           <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-danger-deep">Go to</p>
           <p className="font-display text-xl font-semibold text-ink">{nearest.center.name}</p>
           <p className="mt-1 text-sm font-semibold text-ink-2">{formatWalkTime(nearest.meters)}</p>
-          {nearest.center.note && <p className="mt-1 text-xs text-ink-3">{nearest.center.note}</p>}
+          {nearest.center.note && <p className="mt-1 text-sm text-ink-2">{nearest.center.note}</p>}
           {route.allFlooded ? (
-            <p className="mt-2 text-xs font-semibold text-danger-deep">
+            <p className="mt-2 text-sm font-semibold text-danger-deep">
               Every known route may be flooded. Follow barangay officials.
             </p>
           ) : (
             route.detourMeters !== null && (
-              <p className="mt-2 text-xs text-ink-2">
+              <p className="mt-2 text-sm text-ink-2">
                 Avoids streets likely flooded (+{walkMinutes(route.detourMeters)} min).
               </p>
             )

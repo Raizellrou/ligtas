@@ -29,7 +29,7 @@ export function SplashScreen({ onContinue }: { onContinue: () => void }) {
 
       <button
         onClick={onContinue}
-        className="mt-10 w-full max-w-xs rounded-lg bg-accent py-3 text-sm font-semibold text-white hover:bg-accent-deep"
+        className="mt-10 w-full max-w-xs rounded-lg bg-accent py-3 text-sm font-semibold text-ink hover:brightness-95"
       >
         Continue
       </button>
