@@ -1,8 +1,9 @@
 // Builds the offline evacuation map for the demo barangay from OpenStreetMap.
 //
-// Run by hand (`pnpm --filter @ligtas/pwa map:build`); the two JSON files it
-// writes are committed, so `pnpm build` and CI never touch the network. This
-// is a one-time snapshot, not a runtime dependency: the app only draws what
+// Run by hand (`pnpm --filter @ligtas/pwa map:build`); the JSON files it
+// writes to src/data (nangka-map, nangka-graph, nangka-routes) are committed,
+// so `pnpm build` and CI never touch the network. This is a one-time
+// snapshot, not a runtime dependency: the app only draws and routes over what
 // is baked in here, which is what makes the map work with no connection.
 //
 // What is real and what is not:
@@ -12,8 +13,11 @@
 //            purok anchors are generated (seeded k-means over the road
 //            network). The UI labels them "Demo layout, not official".
 //
-// Walking routes are precomputed here (Dijkstra over the OSM walking graph),
-// so the app needs no graph, no routing code and no library at runtime.
+// The walking road network is baked in as nangka-graph.json, and the app
+// routes over it in the browser (src/lib/routing.ts: Dijkstra from each center,
+// per alert severity, avoiding streets in the demo flood model below). The
+// walking distances written to nangka-routes.json are the calm-weather
+// baseline the app shows before the graph chunk has loaded.
 //
 // Overpass: the public servers rate-limit and time out under load, so every
 // query is cached in the OS temp dir and retried with backoff across mirrors.

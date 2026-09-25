@@ -25,7 +25,7 @@ Stellar keypairs ARE the alert signing identity. `Keypair.signMessage` / `verify
 
 ## Testing
 
-Vitest on `packages/core`.
+Vitest, run from the repo root (`pnpm test`) across `packages/core`, `packages/hub` and `apps/pwa`. `packages/core` is where a bug is most consequential, so it gets the most coverage.
 
 ## HARD CONSTRAINTS
 

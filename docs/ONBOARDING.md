@@ -53,7 +53,7 @@ stop at the first failure rather than improvising around it.
      pnpm --filter @ligtas/stellar build
      pnpm --filter @ligtas/hub build
 
-5. Run `pnpm test`. Expect 5 test files, 30 tests passing. Report the actual number.
+5. Run `pnpm test`. Expect every test file to pass (core, hub and pwa tests run together). Report the actual number of files and tests; do not compare it to a remembered figure.
 
 6. Smoke-test the hub: start it on port 3001 (build output only — `node
    packages/hub/dist/index.js`, never `src/index.ts`, it has no direct-run path), then
@@ -190,8 +190,10 @@ graph — build it first, always.
 pnpm test
 ```
 
-Expected: **5 test files, 30 tests passing** (Vitest, all in `packages/core`). If you see
-29, you are on an older commit — pull.
+Expected: every test file passes (Vitest, run from the repo root across `packages/core`,
+`packages/hub` and `apps/pwa`). The count grows as work lands, so it is not pinned here; what
+matters is zero failures. If a whole package's tests are missing from the output, or the
+core count looks small, you are on an older commit — pull.
 
 Then confirm the hub actually starts. PowerShell:
 
@@ -227,10 +229,16 @@ expected until you set a Stellar secret (§4.4).
 pnpm --filter @ligtas/pwa dev
 ```
 
-Opens on http://localhost:5173. It runs against the captured bundle at
+Opens on http://localhost:5173. With no hub running it uses the captured bundle at
 `apps/pwa/public/alert-bundle.json` — real signed packets recorded from an actual
 Meshtasticator run, including a forged and a replayed one — and verifies every entry in the
 browser through the real `@ligtas/core`. Three role tabs: Resident, Tester, How it works.
+
+With a hub running on port 3001 (§4.2) the app polls its `GET /alerts` every 15 s instead, so
+an alert posted to the hub appears in the open app without a reload; the household check-in
+also needs the hub. To try it, post a signed packet from `packages/core/scripts/emit-alert.ts`
+to the hub's `POST /alert` (§4.1). How each part of the resident app works, and what is demo
+data, is in `apps/pwa/README.md`.
 
 `@ligtas/core` must be built first (it is a workspace dependency of the PWA). If the PWA
 throws on import, that is what you forgot.
@@ -439,7 +447,7 @@ written 2 September and many commits landed after it. Trust this table over that
 | `packages/stellar` | **Done.** Horizon Testnet client, Friendbot funding, `anchorAlertHash` with `MEMO_HASH`, and `preparePayoutTransaction`. Proven live on Testnet with the memo decoded independently from Horizon. | `ab5a6b5` |
 | **Hub drain worker** | **Done.** Reconciles `submitted`/`pending` rows before picking up new work; records the transaction hash before awaiting confirmation; falls back to querying existing claimable balances when a transaction-hash lookup itself is ambiguous (PRD §7's "where uncertain" case). Verified live including a simulated mid-drain crash, which reconciled without double-anchoring or double-paying. | `041c137`, `packages/hub/src/drain.ts` |
 | `apps/sensor-wokwi` | **Done.** Real on-device Ed25519 signing cross-checked against the Stellar SDK, sketch compiles clean, and the Wokwi runtime itself has been run live (booted, WiFi connected, LED reacted to the potentiometer). One remaining gap: full Serial output was never captured — the anonymous Wokwi session had no Serial Monitor panel available. | `be9ad22`, `23dd7c0` |
-| `apps/pwa` | **Stage 3 and Stage 4 both done.** Vite + React 19 + Tailwind v4, three roles (Resident / Tester / How it works), real in-browser verification, deployed to Vercel, `vite-plugin-pwa` service worker + `idb` persistence in place. | `f99b056`, `82caa0d`, and Stage 4's `apps/pwa` offline-hardening PR |
+| `apps/pwa` | **Stage 3 and Stage 4 both done, and grown well past them.** Vite + React 19 + Tailwind v4, three roles (Resident / Tester / How it works), real in-browser verification, deployed to Vercel, `vite-plugin-pwa` service worker + `idb` persistence in place. Since Stage 4 it also has a tiered alert flow, a real offline map with flood-aware routing, on-device location, household check-in, freshness indicators and live alert polling — see the table under §7. | `f99b056`, `82caa0d`, Stage 4's `apps/pwa` offline-hardening PR, and the rows in §7 |
 
 ### Doc drift — resolved
 
@@ -494,6 +502,24 @@ each claimable balance it creates raises *its own* reserve requirement. Househol
 accounts do **not** need to exist or be funded first — verified live, three claimable
 balances created for three fresh, never-funded demo addresses. (An earlier version of this
 note wrongly implied the household side needed funding too.)
+
+### PWA product work since Stage 4
+
+Not on the original stage plan. The resident app grew beyond "one instruction for my purok"
+(PRD §8, "Resident experience"; feature detail lives in `apps/pwa/README.md`, not here).
+
+| Work | State | Commit | Verified how, and what is not |
+|---|---|---|---|
+| Tiered alert flow: only Tier 3 takes over the screen | Done | `7246488` | In a browser, all three tiers. |
+| Real offline map of Nangka, Marikina (OpenStreetMap, ODbL) replacing an invented one | Done | `fd720d3` | In a browser and offline via the production build plus service worker. Purok positions are a **generated demo layout**; centers are **not LGU-confirmed**. |
+| Live/simulated location, flood-aware routing, optional household join | Done | `7e14719` | In a browser, with the walk simulator. Flood-prone streets are a **demo model from closeness to waterways, not a survey**. Real GPS **not tested on a device**. |
+| Emergency path: no splash, any tab, real modal, vibration | Done | `dbd5320` | In a browser. Vibration **not tested on a device**; unsupported on iPhone. |
+| Readability: contrast, dark ink on marigold, bigger map, focus ring | Done | `f1f3fee` | Contrast computed and guarded by a test; audit of resident screens at zero failures. **Colour-blindness and larger text sizes not tested.** |
+| "How old is this?" on alerts, the alert list and the household roster | Done | `d883640` | In a browser, including offline with the service worker. |
+| Live alert polling from the hub | Done | `8c18a61` | Against a throwaway hub with a real signed alert; **not on a phone or a real network**. No push delivery: a phone that is not running the app hears nothing (PRD §12 #10). |
+
+Open items this work created are PRD §12 #9–11: real flood data, delivery to a phone that is
+not looking, and the hub's in-memory replay guard.
 
 ### Blocking open questions
 
@@ -645,7 +671,8 @@ package everything else depends on.
 | Hub logs `drain: disabled` | `LIGTAS_HUB_STELLAR_SECRET` unset | Expected. Set it only when working on anchoring. |
 | `POST /drain` returns 503 | Same as above | Same as above |
 | Hub returns `rejected_signature` for a "genuine" packet | Signed with a fresh random keypair | Pass `--issuer-secret` matching the configured `issuerPublicKey`. See §4.1. |
-| `pnpm test` shows 29 tests | Stale checkout | `git pull origin development-branch` |
+| `pnpm test` runs only the `packages/core` tests, or fewer files than a teammate sees | Stale checkout | `git pull origin development-branch` |
+| The PWA says "Can't reach the hub right now" | The hub is not running, or the page is not served from the one origin the hub allows (`LIGTAS_PWA_ORIGIN`, default `http://localhost:5173`) — a page on `localhost:4173` (the production preview) is refused even with the hub up | Start the hub (`node packages/hub/dist/index.js`) and open the app from `http://localhost:5173`. See `apps/pwa/README.md` |
 | `better-sqlite3` tries to compile from source | Node version with no matching prebuild | Switch to Node 24.x |
 | Mesh: `ModuleNotFoundError: lib.interactive` | Using your Python, not Meshtasticator's venv | Run with `<meshtasticator>/.venv/Scripts/python.exe` |
 | Mesh: cannot find Meshtasticator | Not checked out as a sibling directory | Set `MESHTASTICATOR_PATH` |

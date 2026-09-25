@@ -24,7 +24,7 @@ pnpm --filter @ligtas/hub build    # tsc has no direct .ts execution path here -
 PORT=3001 node packages/hub/dist/index.js
 ```
 
-Env vars: `PORT` (default 3001), `LIGTAS_DB_PATH` (default `packages/hub/hub.sqlite`), `LIGTAS_ISSUERS_PATH` (default `packages/hub/config/issuers.json`), `LIGTAS_HOUSEHOLDS_PATH` (default `packages/hub/config/households.json`).
+Env vars: `PORT` (default 3001), `LIGTAS_DB_PATH` (default `packages/hub/hub.sqlite`), `LIGTAS_ISSUERS_PATH` (default `packages/hub/config/issuers.json`), `LIGTAS_HOUSEHOLDS_PATH` (default `packages/hub/config/households.json`), `LIGTAS_PWA_ORIGIN` (default `http://localhost:5173`) — the one web origin allowed to read the hub's responses, see "CORS" below.
 
 **Drain worker** (PRD Section 6.2, `@ligtas/stellar`) is optional and off unless configured:
 
@@ -34,9 +34,15 @@ Env vars: `PORT` (default 3001), `LIGTAS_DB_PATH` (default `packages/hub/hub.sql
 ## API
 
 - `POST /alert` — body `{ "packetHex": "<168 hex chars>" }`. Returns `{ decision, alertHash? }`. `decision` is one of `accepted`, `rejected_signature`, `rejected_unknown_issuer`, `rejected_replay`, `duplicate`, `malformed`.
-- `GET /alerts` — a live `AlertBundle` (`source: "live"`), same shape `apps/pwa` consumes from a captured file.
+- `GET /alerts` — a live `AlertBundle` (`source: "live"`), same shape `apps/pwa` consumes from a captured file. Only accepted alerts are in it: a rejected packet is never stored. `apps/pwa` polls this every 15 s while the app is open, and verifies every packet itself rather than trusting the hub's filtering.
 - `POST /drain` — manually triggers an outbox drain: anchors every `pending` alert to Stellar Testnet (reconciling anything stuck `submitted` from an interrupted run first), then, for each now-`confirmed` alert with `payout_status = 'none'`, creates one claimable balance per matched household (PRD Section 7) — flat by severity tier (`@ligtas/stellar`'s `PAYOUT_TIER_AMOUNT_XLM`), reconciling anything stuck `pending` from an interrupted run first, the same way anchoring does. Returns `{ anchors: [{ alertHash, outcome }], payouts: [{ alertHash, outcome, matchedHouseholds? }] }`. 503 if `LIGTAS_HUB_STELLAR_SECRET` isn't set.
 - `GET /health` — liveness check.
+
+**Household check-in** (`src/householdRoutes.ts`, `src/checkins.ts`) — the PWA's "I'm safe" / "I need help":
+
+- `GET /household/resolve/:joinCode` — `{ householdId }`, or 404 `{ error: "unknown join code" }`.
+- `GET /household/:householdId/status` — `{ householdId, members: [{ displayName, status, updatedAt }], stellarAddress }`, or 404. `updatedAt` is **milliseconds** (the alert times elsewhere are seconds) and is when the hub recorded the check-in, not when the person tapped it.
+- `POST /household/:householdId/checkin` — body `{ displayName, status, clientCheckinId }`: `displayName` a non-empty string of at most 40 characters, `status` `"safe"` or `"need_help"`, `clientCheckinId` a non-empty client-generated id. Returns `{ householdId, members }`; 400 with a message on a bad field, 404 on an unknown household. A member has one row, so a new status replaces the old one, and re-sending the same `clientCheckinId` (a retry from the phone's offline queue) is ignored rather than applied twice.
 
 **Dev-only, off by default** — the Tester tab's "Live mesh demo" panel (`apps/pwa`), see
 `docs/ONBOARDING.md` Section 4.3:
@@ -56,9 +62,15 @@ API: `/alert`, `/alerts`, `/drain`, and `/health` all have zero auth today, matc
 project's threat model that the hub only ever sits on a barangay's own local network. This
 route spawns local processes, which is categorically more sensitive, so it gets its own
 explicit opt-in rather than quietly inheriting that same "no auth" default — never enable it
-on a hub any judge or the public can reach. CORS for these routes is scoped to themselves
-alone (checked against `LIGTAS_PWA_ORIGIN`, default `http://localhost:5173`); the other four
-routes' cross-origin exposure is unchanged.
+on a hub any judge or the public can reach.
+
+**CORS.** The PWA is a different origin from the hub, so a browser blocks it from reading any
+response that does not say otherwise. Three route groups say so, each for `LIGTAS_PWA_ORIGIN`
+only (the origin is echoed back on an exact match, never `*`): `GET /alerts`, `/household/*`, and
+`/demo/*` (each scoped to itself). `POST /alert`, `POST /drain` and `/health` send no CORS header, so
+a browser page cannot read them. A page served from any other origin, for example the
+production preview on `localhost:4173`, gets "can't reach the hub" from the PWA even though the
+hub is up.
 
 ## Verified live, not just unit tested
 
@@ -80,6 +92,8 @@ Payout (PRD Section 7 / Stage 5 item 5.1) was verified the same way, in the same
 
 Stage 5 item 5.3 (idempotency hardening) is done: `packages/hub/test/drain.test.ts` has dedicated automated coverage for the crash-before-confirmation, crash-before-network-receipt, already-created, and concurrent-overlapping-`drainOutbox` cases (the last one a real double-payment race, caught live during a demo run and fixed — see `packages/hub/src/drain.ts`'s module docstring). The extra defense-in-depth check PRD Section 7 describes for the *ambiguous* case — querying Horizon for existing claimable balances when `payout_status` itself can't be trusted via the transaction hash — is also built (`reconcilePayoutByExistingBalances` in `drain.ts`, backed by `findMatchingClaimableBalance` in `packages/stellar`). **Unlike everything else in this section, that fallback path has been unit-tested against mocked Horizon responses, not yet exercised live** — it only runs when Horizon itself returns something other than a clean "not found" for a transaction-hash lookup, a case that hasn't come up in a real Testnet run yet.
 
-## Known limitation
+## Known limitations
+
+**The replay guard is in memory.** Accepted alerts are stored in SQLite, but the `ReplayGuard` that rejects an old sequence number starts empty when the hub starts. After a restart, an older sequence from an authorised issuer could be accepted again. Persisting the per-issuer high-water mark would close it; it has not been built.
 
 Node's native TypeScript execution can't resolve this package's own `.ts` sources directly (its `@ligtas/core` import expects compiled `.js`), so `packages/hub` has to be compiled with `tsc` before running — there's no `tsx`-style direct-run path yet. `pnpm --filter @ligtas/hub build` followed by `node dist/index.js`, not `node src/index.ts`.

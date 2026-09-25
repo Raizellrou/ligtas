@@ -4,7 +4,7 @@
 
 Track: Climate Resilience and Hydrometeorological Disaster Management
 Stage 3 · Forge
-Version 0.4
+Version 0.5
 
 This document is the system design for the concept set out in [README.md](README.md). The README states the problem and the pitch; this document states what gets built, how the pieces fit, and what "done" means at each stage.
 
@@ -44,6 +44,7 @@ Explicitly out of scope for this hackathon. Named here so scope creep is visible
 - Soroban smart contracts, or any Rust component
 - Physical hardware procurement, assembly, or field RF testing
 - Mainnet deployment
+- Turn-by-turn navigation, live traffic, or real-time flood conditions in the resident app's map (§8 shows a fixed offline snapshot and a demo flood model, and says so)
 
 ---
 
@@ -250,6 +251,16 @@ React + Vite + Tailwind + `vite-plugin-pwa`, with `idb` for cached alerts.
 - On receiving an alert, the app shows the instruction for that resident's purok only if their bit is set in `purokBitmap` — otherwise it shows an explicit "your purok is not affected" state rather than an empty screen
 - Cached alerts are listed newest first, each showing issued time and severity
 
+**Resident experience (added in v0.5).** The bullets above are the original Version 0 surface. The following requirements were added as the PWA was built; implementation detail and device limits are in [`apps/pwa/README.md`](apps/pwa/README.md).
+
+- **Tiered flow.** Severity maps to *watch* (Tier 1), *prepare* (Tier 2) and *evacuate* (Tier 3). Only an evacuation takes over the screen; lower tiers are a card, so a full-screen interruption keeps meaning "go now". The newest accepted alert for the resident's purok wins, so a later lower tier reads as de-escalation. A phone opened during an evacuation goes straight to it, and it can be dismissed only by the resident acknowledging it.
+- **Where to go, computed on the phone.** The nearest evacuation center and a walking route come from a road network baked into the app, so they need no connection. From Tier 2 up the route avoids streets marked as flood-prone. The flood model is a **demo stand-in** derived from closeness to mapped waterways, not a flood survey, and the app says so; it is not live conditions.
+- **Location stays on the phone.** A resident may show their own position, using the browser's on-device geolocation; it is requested only on a tap, works offline, and is never transmitted.
+- **Household check-in is optional.** A purok is enough to see alerts and the map. Joining a household enables "I'm safe" / "I need help" and the family roster; a check-in is stored on the phone first and sent when the hub is reachable.
+- **Say how old it is.** Each claim shows its age: an alert its issue time (display only; `issuedAt` is still never used to accept, reject or order, per §5.4), the alert list when this phone last got it, and each roster entry when the hub recorded it. "Not affected" is never shown without that context, and from a phone that has been out of touch too long (3 hours, or 10 minutes when polling a live hub) it becomes a warning that newer alerts may have been missed.
+- **Live alerts while the app is open.** Where a hub is reachable the PWA polls it (15 s) so a new alert appears without a reload; once the hub has answered, an outage never replaces the live alerts with the recorded bundle. There is no push delivery (see §12).
+- **Readable in bad conditions.** Text meets WCAG AA contrast, guarded by a test.
+
 In the field the PWA is a *display* surface: the hub is the verifying authority, and the phone renders what the hub has already accepted. The PWA's own verification is not what keeps a forged alert off a resident's screen — the relays and the hub do that, before it ever reaches WiFi range.
 
 It nonetheless carries `packages/core` and can verify a packet itself, because `core` is pure and offline and therefore runs unchanged in a browser. That matters for the hosted build described in §11: with no hub reachable, in-browser verification is what makes a published alert bundle independently checkable by anyone who opens the page.
@@ -278,7 +289,7 @@ The open rows are stated deliberately. They are real and they are not solved by 
 
 ## 10. Repository layout
 
-TypeScript monorepo, pnpm workspaces. Not yet scaffolded — this is the intended shape.
+TypeScript monorepo, pnpm workspaces. This is the shape as built.
 
 ```
 packages/
@@ -293,7 +304,7 @@ apps/
   sensor-wokwi/  Arduino C++ for the ESP32 sensor node
 ```
 
-Testing is Vitest, concentrated on `packages/core` — the packet codec, signature verification, and the replay and dedupe rules are where a bug is both most likely and most consequential.
+Testing is Vitest, run from the repo root across `packages/core`, `packages/hub` and `apps/pwa`, and concentrated on `packages/core` — the packet codec, signature verification, and the replay and dedupe rules are where a bug is both most likely and most consequential.
 
 ---
 
@@ -340,7 +351,15 @@ Carried forward rather than invented answers. Each needs a decision before the s
 7. **Reclaim window.** How long an unclaimed claimable balance stays outstanding before the barangay account can reclaim it.
 8. **Deployment partner.** No barangay or LGU has committed to a pilot. Field validation (₱4,300, two nodes) cannot be scheduled without one.
 
+Opened by the v0.5 resident-app work:
+
+9. **Real flood data.** The map's flood-prone streets are derived from closeness to mapped waterways, not from a survey, and the purok positions and evacuation centers are a demo layout and OpenStreetMap-named places. A real barangay would need its own DRRM-confirmed flood-prone streets, purok boundaries and centers, ideally from the BDRRMC. Field validation (question 8) is the way to get them.
+10. **Delivery to a phone that is not looking.** The PWA polls while it is open; a phone in a pocket hears nothing. Push would need a server the barangay's offline network does not have, so the alternatives are the siren, a background sync that the platforms do not guarantee, or accepting the gap. Undecided.
+11. **Replay guard across a hub restart.** The hub's replay state is in memory, so after a restart an older sequence number from an authorised issuer could be accepted again. Persisting each issuer's high-water mark is the obvious fix; not built.
+
 ### Resolved since v0.1
+
+- **What the resident app does beyond one instruction (v0.5).** Previously §8 described a single purok instruction. It now specifies the tiered flow, an on-device route to the nearest center with a demo flood model, on-device location, optional household check-in, ages on everything shown, and live polling — with the limits of each stated (§8, questions 9–11).
 
 - **Mesh carriage and the mesh-sim boundary.** Previously undefined: what actually crosses the TCP boundary to Meshtasticator. Now specified in §5.5 — the raw 84 bytes as Meshtastic data payload, driven by a Python process kept deliberately outside the TypeScript codebase for licence reasons.
 - **Decoder input bounds.** Previously unstated: what a decoder does with an out-of-range field value. Now split in two — decoding never rejects on field values, since every byte pattern is structurally valid, while `validateBody` handles semantics separately. Implemented and tested in `packages/core`.

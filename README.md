@@ -100,6 +100,7 @@ Named deliberately rather than discovered later.
 - **Wallet onboarding is unsolved at scale.** For now, payouts route to a barangay relief account under multisig rather than to 200 individual households.
 - **Regulatory.** 433 MHz and 868 MHz are not licence-free in the Philippines. This uses 915–918 MHz (AS923-3) under NTC MC 03-05-2007 as amended.
 - **The evacuation map is a demo snapshot.** Roads, waterways and the barangay outline of Nangka, Marikina City are real, © OpenStreetMap contributors (ODbL), baked into the app so the map works with no connection; regenerate with `pnpm --filter @ligtas/pwa map:build`. The purok positions are a generated demo layout and the evacuation centers are places OpenStreetMap names, not LGU-confirmed. From Alert Tier 2 up, routes avoid streets near rivers, streams and canals — a demo stand-in derived from OpenStreetMap, not a flood survey, so it is not live conditions. A resident can also show their own position on the map (phone GPS works offline; the location never leaves the phone). Streets closed by the barangay in real time, sent as signed messages over the same LoRa channel, are future work.
+- **The phone only hears while the app is open.** The resident app polls the hub every 15 seconds; there is no push, so a phone in a pocket depends on the siren. Every screen says how old what it shows is ("Alerts checked 4 min ago"), and warns when a phone has been out of touch long enough that "your purok is not affected" cannot be trusted.
 
 ---
 
