@@ -3,6 +3,7 @@ import {
   ALERT_OLD_AFTER_S,
   CHECK_STALE_AFTER_S,
   ageSeconds,
+  checkStaleAfter,
   formatAge,
   formatClock,
   isStale,
@@ -46,6 +47,14 @@ describe('ageSeconds', () => {
     expect(ageSeconds(issuedAtSeconds * 1000, NOW)).toBe(600)
     // Passing raw seconds by mistake would look like 1970 -- decades old, not 10 minutes.
     expect(ageSeconds(issuedAtSeconds, NOW)).toBeGreaterThan(50 * 365 * 86400)
+  })
+})
+
+describe('checkStaleAfter', () => {
+  it('judges a polled live feed far more strictly than the static one', () => {
+    expect(checkStaleAfter(true)).toBe(10 * 60)
+    expect(checkStaleAfter(false)).toBe(CHECK_STALE_AFTER_S)
+    expect(checkStaleAfter(true)).toBeLessThan(checkStaleAfter(false))
   })
 })
 

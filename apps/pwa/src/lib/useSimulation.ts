@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AlertBundle, AlertBundleEntry } from '@ligtas/core'
 import { cacheBundle, loadCachedBundle } from './alertCache'
+import { ALERT_POLL_MS, fetchAlertFeed, fetchHubAlerts, sameAlerts } from './alertFeed'
+import { HUB_CONFIGURED } from './hubUrl'
 import { evaluateBundle, type EvaluatedAlert } from './evaluateBundle'
 import {
   TESTER_ISSUER_INDEX,
@@ -30,8 +32,10 @@ export interface Simulation {
   /** Captured entries plus everything the tester has broadcast, in order. */
   bundle: AlertBundle | null
   evaluated: EvaluatedAlert[] | null
-  /** How many leading entries came from the real captured mesh-sim run. */
+  /** How many leading entries came from the alert feed (the hub, or the recorded run) rather than from the tester. */
   capturedCount: number
+  /** How many of those are the recorded demo run, as opposed to a live hub -- 0 when the hub is the source. */
+  historicalCount: number
   /** True when the network fetch failed and this is the last idb-cached bundle instead. */
   offline: boolean
   /** When this device last got the alert list (ms): now on a successful fetch, the stored fetch time when offline. */
@@ -59,54 +63,84 @@ export function useSimulation(): Simulation {
 
   useEffect(() => {
     let cancelled = false
+    let timer: number | undefined
+    let inFlight = false
+    // Once the hub has answered, never fall back to the recorded demo bundle
+    // mid-session: that would silently swap real alerts for an old recording.
+    // A failed poll then just leaves the live data up while "checked" ages.
+    let hubReached = false
+    let shown: AlertBundle | null = null
 
-    // The query string is deliberate. The service worker precaches
-    // /alert-bundle.json, so a bare fetch "succeeds" from that cache with no
-    // network at all, and an offline phone would look freshly updated. A URL
-    // the service worker doesn't know goes to the real network, and fails when
-    // there isn't one -- which is what tells us the phone is out of touch.
-    function load(initial: boolean) {
-      fetch(`/alert-bundle.json?t=${Date.now()}`, { cache: 'no-store' })
-        .then((r) => {
-          if (!r.ok) throw new Error(`fetch failed: ${r.status}`)
-          return r.json() as Promise<AlertBundle>
-        })
-        .then((b) => {
-          if (cancelled) return
-          const at = Date.now()
-          setCaptured(b)
-          setOffline(false)
-          setError(null)
-          setCheckedAt(at)
-          void cacheBundle(b, at)
-        })
-        .catch((fetchError: unknown) => {
-          // A failed re-check keeps what is already on screen.
-          if (!initial) return
-          // No network (or no hub reachable): fall back to the last bundle
-          // this device actually received, rather than an empty screen.
-          void loadCachedBundle().then((cached) => {
-            if (cancelled) return
-            if (cached !== null) {
-              setCaptured(cached.bundle)
-              setCheckedAt(cached.fetchedAt)
-              setOffline(true)
-              setError(null)
-            } else {
-              setError(String(fetchError))
-            }
-          })
-        })
+    function apply(feed: AlertBundle) {
+      const at = Date.now()
+      if (shown === null || !sameAlerts(shown, feed)) {
+        shown = feed
+        setCaptured(feed)
+      }
+      setOffline(false)
+      setError(null)
+      setCheckedAt(at)
+      // Written every time, not only on change, so the "checked ... ago" a
+      // phone shows after going offline is when it last actually looked.
+      void cacheBundle(feed, at)
     }
 
-    load(true)
-    // Coming back online is the moment to look again; without this the
-    // "offline" state set at load would never clear.
-    const onOnline = () => load(false)
+    // Only where a hub is meant to exist, and only while someone is looking:
+    // the timer chain stops while the tab is hidden and load() restarts it.
+    function schedule() {
+      window.clearTimeout(timer)
+      if (cancelled || !HUB_CONFIGURED || document.hidden) return
+      timer = window.setTimeout(() => void load(false), ALERT_POLL_MS)
+    }
+
+    async function load(initial: boolean) {
+      if (inFlight) return
+      inFlight = true
+      window.clearTimeout(timer)
+      try {
+        const feed = hubReached
+          ? { bundle: await fetchHubAlerts(), from: 'hub' as const }
+          : await fetchAlertFeed()
+        if (cancelled) return
+        if (feed.from === 'hub') hubReached = true
+        apply(feed.bundle)
+      } catch (fetchError: unknown) {
+        // A failed re-check keeps what is already on screen.
+        if (initial && !cancelled) {
+          // No network (or no hub reachable): fall back to the last bundle
+          // this device actually received, rather than an empty screen.
+          const cached = await loadCachedBundle()
+          if (cancelled) return
+          if (cached !== null) {
+            shown = cached.bundle
+            setCaptured(cached.bundle)
+            setCheckedAt(cached.fetchedAt)
+            setOffline(true)
+            setError(null)
+          } else {
+            setError(String(fetchError))
+          }
+        }
+      } finally {
+        inFlight = false
+        schedule()
+      }
+    }
+
+    void load(true)
+    // Coming back online, or back to the app, is the moment to look again;
+    // without the first the "offline" state set at load would never clear.
+    const onOnline = () => void load(false)
+    const onVisible = () => {
+      if (!document.hidden) void load(false)
+    }
     window.addEventListener('online', onOnline)
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       cancelled = true
+      window.clearTimeout(timer)
       window.removeEventListener('online', onOnline)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 
@@ -160,6 +194,7 @@ export function useSimulation(): Simulation {
     bundle,
     evaluated,
     capturedCount: captured?.alerts.length ?? 0,
+    historicalCount: captured?.source === 'captured' ? captured.alerts.length : 0,
     offline,
     checkedAt,
     testerPublicKey: issuer.publicKey(),

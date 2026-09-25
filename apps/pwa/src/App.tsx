@@ -123,11 +123,12 @@ function App() {
         {role === 'resident' && (
           <ResidentView
             alerts={sim.evaluated}
-            capturedCount={sim.capturedCount}
+            historicalCount={sim.historicalCount}
             checkin={checkin}
             liveLocation={liveLocation}
             offline={offline}
             checkedAt={sim.checkedAt}
+            liveFeed={sim.bundle?.source === 'live'}
           />
         )}
         {role === 'tester' && <TesterView sim={sim} liveLocation={liveLocation} />}

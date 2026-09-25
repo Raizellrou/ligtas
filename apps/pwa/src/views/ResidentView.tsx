@@ -3,8 +3,8 @@ import { activeEvacuation } from '../lib/activeEvacuation'
 import { latestRelevantAlert, type EvaluatedAlert } from '../lib/evaluateBundle'
 import {
   ALERT_OLD_AFTER_S,
-  CHECK_STALE_AFTER_S,
   ageSeconds,
+  checkStaleAfter,
   isStale,
   sinceLabel,
   whenLabel,
@@ -44,19 +44,23 @@ const JOIN_CODE_OPTIONS: { purok: number; code: string }[] = [
 
 export function ResidentView({
   alerts,
-  capturedCount,
+  historicalCount,
   checkin,
   liveLocation,
   offline,
   checkedAt,
+  liveFeed,
 }: {
   alerts: EvaluatedAlert[] | null
-  capturedCount: number
+  /** Leading alerts that are the recorded demo run, not a live hub -- excluded from the relief gate. */
+  historicalCount: number
   checkin: UseHouseholdCheckin
   liveLocation: LiveLocation
   offline: boolean
   /** When this device last got the alert list (ms), or null before the first check. */
   checkedAt: number | null
+  /** True when the alerts come from a live hub, which is polled, so silence is judged more strictly. */
+  liveFeed: boolean
 }) {
   const { purok, setPurok, clearPurok } = usePersistedPurok()
   const now = useNow()
@@ -122,7 +126,7 @@ export function ResidentView({
   // the leading captured entries are a historical demo recording (Sep
   // 2026), and a household's real balance from that real past run
   // shouldn't read as "relief happening right now" on a fresh page load.
-  const liveAlerts = alerts?.filter((a) => a.index >= capturedCount) ?? null
+  const liveAlerts = alerts?.filter((a) => a.index >= historicalCount) ?? null
   const affected = liveAlerts !== null && latestRelevantAlert(liveAlerts, purok) !== undefined
   const showRelief = affected && relief !== null
 
@@ -165,7 +169,7 @@ export function ResidentView({
         <p className="text-ink-2">Loading alerts…</p>
       ) : (
         <>
-          <CheckedLine checkedAt={checkedAt} now={now} />
+          <CheckedLine checkedAt={checkedAt} now={now} live={liveFeed} />
           <AlertList alerts={alerts} purok={purok} position={liveLocation.position} now={now} />
         </>
       )}
@@ -338,9 +342,9 @@ function JoinStep({
 // has checked recently; a warning when it has not, because "your purok is not
 // affected" from a phone that has been out of touch for hours is not a
 // reassurance and must not read like one.
-function CheckedLine({ checkedAt, now }: { checkedAt: number | null; now: number }) {
+function CheckedLine({ checkedAt, now, live }: { checkedAt: number | null; now: number; live: boolean }) {
   if (checkedAt === null) return null
-  if (isStale(ageSeconds(checkedAt, now), CHECK_STALE_AFTER_S)) {
+  if (isStale(ageSeconds(checkedAt, now), checkStaleAfter(live))) {
     return (
       <p className="mb-2 rounded border border-accent bg-accent-bg p-2 text-sm text-ink">
         <span className="font-semibold">Last checked {sinceLabel(checkedAt, now)}.</span> This phone may have missed

@@ -6,6 +6,14 @@
 /** After this long without hearing from the source, "no alert" stops being reassuring. A judgement call, not from the PRD. */
 export const CHECK_STALE_AFTER_S = 3 * 3600
 
+/** With a live hub feed polled every few seconds, ten silent minutes already means the phone is out of touch. */
+export const CHECK_STALE_LIVE_AFTER_S = 10 * 60
+
+/** How long without a successful check before "no alert" stops being reassuring, for this kind of feed. */
+export function checkStaleAfter(live: boolean): number {
+  return live ? CHECK_STALE_LIVE_AFTER_S : CHECK_STALE_AFTER_S
+}
+
 /** An alert older than this gets a "check whether it still applies" note. Also a judgement call. */
 export const ALERT_OLD_AFTER_S = 12 * 3600
 

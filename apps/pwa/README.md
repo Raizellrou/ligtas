@@ -35,7 +35,15 @@ than a broken button.
 
 ## Where the data comes from
 
-`useSimulation.ts` loads `public/alert-bundle.json` — genuine, forged, and replayed packets
+**Live hub, when there is one.** Where a hub is configured (always in `pnpm dev`; in a
+production build only if `VITE_LIGTAS_HUB_URL` is set), `useSimulation.ts` polls the hub's
+`GET /alerts` every 15 s while the app is open and visible, and again on reconnect and when the
+tab returns to the foreground. A new alert, including a Tier 3 takeover, shows up without a
+reload. Once the hub has answered, a later outage keeps the live alerts on screen (it never
+swaps them for the recording), and "Alerts checked … ago" turns into a warning after 10 minutes
+of silence. The hosted demo has no hub and never polls one.
+
+**Otherwise, the recorded run.** `useSimulation.ts` loads `public/alert-bundle.json` — genuine, forged, and replayed packets
 captured from an actual Meshtasticator run via `packages/mesh-sim/bridge_to_hub.py` against a
 real running `packages/hub` — and runs every entry through `@ligtas/core`'s real
 `decodePacket` / `verifyBody` / `ReplayGuard` in the browser. Anyone with the page open can

@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import type { Keypair } from "@stellar/stellar-sdk/base";
 import type Database from "better-sqlite3";
 import { AlertService } from "./alertService.js";
+import { allowPwaOrigin } from "./cors.js";
 import { drainOutbox } from "./drain.js";
 import { createDemoRouter } from "./demoRoutes.js";
 import { createHouseholdRouter } from "./householdRoutes.js";
@@ -47,7 +48,9 @@ export function createServer(
     res.status(status).json(result);
   });
 
-  app.get("/alerts", (_req, res) => {
+  // The resident PWA polls this for live alerts (apps/pwa/src/lib/alertFeed.ts).
+  // It verifies every packet itself, so reading the feed adds no new trust.
+  app.get("/alerts", allowPwaOrigin(pwaOrigin), (_req, res) => {
     res.json(alerts.toBundle());
   });
 
