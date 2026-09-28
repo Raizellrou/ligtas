@@ -8,5 +8,10 @@
     "issuerIndex": 1,
     "issuerPublicKey": "GB42PKF46LED6DPEJPKC6YWJ4VW5WIQH5AGLKRFVT6VPTBHIYYH2CZWZ",
     "label": "Demo-recording issuer (Testnet, generated 2026-09-12)"
+  },
+  {
+    "issuerIndex": 2,
+    "issuerPublicKey": "GAUNIROLAW2VID6YIPQVULWVUO74ZZ6MJ2OVLSQM5ARGMANUNCICJGPL",
+    "label": "MVP end-to-end proof issuer (Testnet, generated 2026-09-28)"
   }
 ]
