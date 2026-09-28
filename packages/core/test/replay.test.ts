@@ -51,4 +51,32 @@ describe("ReplayGuard", () => {
     // Past TTL: hash forgotten, but sequence rule still fires since 1 <= lastSeq(0)=1.
     expect(guard.evaluate("hash-a", 0, 1, t0 + 1500)).toBe("replay");
   });
+
+  describe("restoreSequence", () => {
+    it("makes a fresh guard behave as if it had already seen that sequence", () => {
+      const guard = new ReplayGuard();
+      guard.restoreSequence(0, 5);
+      expect(guard.evaluate("hash-old", 0, 5)).toBe("replay");
+      expect(guard.evaluate("hash-older", 0, 3)).toBe("replay");
+      expect(guard.evaluate("hash-new", 0, 6)).toBe("accept");
+    });
+
+    it("tracks restored state independently per issuer", () => {
+      const guard = new ReplayGuard();
+      guard.restoreSequence(0, 10);
+      // Issuer 1 has no restored history, so its first sequence is still fresh.
+      expect(guard.evaluate("hash-a", 1, 1)).toBe("accept");
+    });
+
+    it("never lowers a sequence the guard already has, from organic use or a prior restore", () => {
+      const guard = new ReplayGuard();
+      guard.evaluate("hash-a", 0, 9); // organic: lastSeq(0) = 9
+      guard.restoreSequence(0, 3); // a lower restore must not weaken this
+      expect(guard.evaluate("hash-b", 0, 5)).toBe("replay");
+
+      guard.restoreSequence(0, 20); // a higher restore still raises the bar
+      expect(guard.evaluate("hash-c", 0, 12)).toBe("replay");
+      expect(guard.evaluate("hash-d", 0, 21)).toBe("accept");
+    });
+  });
 });

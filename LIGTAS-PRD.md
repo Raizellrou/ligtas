@@ -4,7 +4,7 @@
 
 Track: Climate Resilience and Hydrometeorological Disaster Management
 Stage 3 · Forge
-Version 0.5
+Version 0.6
 
 This document is the system design for the concept set out in [README.md](README.md). The README states the problem and the pitch; this document states what gets built, how the pieces fit, and what "done" means at each stage.
 
@@ -355,11 +355,11 @@ Opened by the v0.5 resident-app work:
 
 9. **Real flood data.** The map's flood-prone streets are derived from closeness to mapped waterways, not from a survey, and the purok positions and evacuation centers are a demo layout and OpenStreetMap-named places. A real barangay would need its own DRRM-confirmed flood-prone streets, purok boundaries and centers, ideally from the BDRRMC. Field validation (question 8) is the way to get them.
 10. **Delivery to a phone that is not looking.** The PWA polls while it is open; a phone in a pocket hears nothing. Push would need a server the barangay's offline network does not have, so the alternatives are the siren, a background sync that the platforms do not guarantee, or accepting the gap. Undecided.
-11. **Replay guard across a hub restart.** The hub's replay state is in memory, so after a restart an older sequence number from an authorised issuer could be accepted again. Persisting each issuer's high-water mark is the obvious fix; not built.
 
 ### Resolved since v0.1
 
-- **What the resident app does beyond one instruction (v0.5).** Previously §8 described a single purok instruction. It now specifies the tiered flow, an on-device route to the nearest center with a demo flood model, on-device location, optional household check-in, ages on everything shown, and live polling — with the limits of each stated (§8, questions 9–11).
+- **What the resident app does beyond one instruction (v0.5).** Previously §8 described a single purok instruction. It now specifies the tiered flow, an on-device route to the nearest center with a demo flood model, on-device location, optional household check-in, ages on everything shown, and live polling — with the limits of each stated (§8, questions 9–11 at the time, now 9–10; #11 is resolved below).
+- **Replay guard across a hub restart (v0.6).** Was open question #11: the hub's replay state was in memory, so after a restart an older sequence from an authorised issuer could be accepted again. Every accepted alert was already durable in the hub's own `alerts` table (issuer, sequence), so `AlertService` now reads that history back at construction and restores each issuer's high-water mark before serving another request. See `packages/hub/README.md`, "Known limitations" (the note there records the one narrow, cosmetic trade-off left: the short-lived duplicate-hash cache is not restored).
 
 - **Mesh carriage and the mesh-sim boundary.** Previously undefined: what actually crosses the TCP boundary to Meshtasticator. Now specified in §5.5 — the raw 84 bytes as Meshtastic data payload, driven by a Python process kept deliberately outside the TypeScript codebase for licence reasons.
 - **Decoder input bounds.** Previously unstated: what a decoder does with an out-of-range field value. Now split in two — decoding never rejects on field values, since every byte pattern is structurally valid, while `validateBody` handles semantics separately. Implemented and tested in `packages/core`.

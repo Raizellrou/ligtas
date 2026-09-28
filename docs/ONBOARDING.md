@@ -517,9 +517,11 @@ Not on the original stage plan. The resident app grew beyond "one instruction fo
 | Readability: contrast, dark ink on marigold, bigger map, focus ring | Done | `f1f3fee` | Contrast computed and guarded by a test; audit of resident screens at zero failures. **Colour-blindness and larger text sizes not tested.** |
 | "How old is this?" on alerts, the alert list and the household roster | Done | `d883640` | In a browser, including offline with the service worker. |
 | Live alert polling from the hub | Done | `8c18a61` | Against a throwaway hub with a real signed alert; **not on a phone or a real network**. No push delivery: a phone that is not running the app hears nothing (PRD §12 #10). |
+| Docs pass: bring READMEs, PRD (→ v0.5) and this guide up to the above | Done | `b53eb58` | Cross-checked against the code (paths, routes, thresholds); `apps/pwa/src/data/DATA-LICENCE.md` added for the OSM-derived map data. |
+| Hub replay guard survives a restart (was PRD §12 #11) | Done | — | `packages/hub/test/alertService.test.ts`: a second `AlertService` against the same db file rejects a sequence the first already accepted. Live-checked against a throwaway hub restarted on the same db file. |
 
-Open items this work created are PRD §12 #9–11: real flood data, delivery to a phone that is
-not looking, and the hub's in-memory replay guard.
+Open items this work created are PRD §12 #9–10: real flood data, and delivery to a phone that
+is not looking. #11 (the replay guard) is resolved as of the row above.
 
 ### Blocking open questions
 

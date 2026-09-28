@@ -63,6 +63,24 @@ export class ReplayGuard {
     return "accept";
   }
 
+  /**
+   * Restores state after a restart. This guard's memory does not survive a
+   * process restart, but a verifying endpoint that durably stores what it
+   * accepted (the hub's `alerts` table) already has everything needed to
+   * rebuild it -- call this once per issuer at startup with the highest
+   * sequence previously accepted, read back from that storage, so an old
+   * sequence cannot be accepted again just because the process restarted
+   * (PRD §12, open question on replay-guard persistence). Never lowers an
+   * already-tracked sequence, so calling this defensively, or more than
+   * once, can only add protection, never remove it. Does not restore
+   * `seenHashes`: that cache's TTL means it protects only against a
+   * near-immediate rebroadcast, which is a narrower window than this closes.
+   */
+  restoreSequence(issuerIndex: number, sequence: number): void {
+    const current = this.lastSeq.get(issuerIndex) ?? -1;
+    if (sequence > current) this.lastSeq.set(issuerIndex, sequence);
+  }
+
   private pruneExpired(now: number): void {
     for (const [hash, entry] of this.seenHashes) {
       if (entry.expiresAt <= now) this.seenHashes.delete(hash);

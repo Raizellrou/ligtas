@@ -26,13 +26,51 @@ interface AlertRow {
   received_at: number;
 }
 
+interface HighestSequenceRow {
+  issuer_pubkey: string;
+  maxSequence: number;
+}
+
 export class AlertService {
   private readonly guard = new ReplayGuard();
+  /** How many configured issuers had prior history restored at startup -- surfaced for the startup log, not used internally. */
+  readonly restoredIssuerCount: number;
 
   constructor(
     private readonly db: Database.Database,
     private readonly issuers: Map<number, string>,
-  ) {}
+  ) {
+    this.restoredIssuerCount = this.restoreGuardFromHistory();
+  }
+
+  /**
+   * The guard's in-memory state does not survive a restart, but every alert
+   * it ever accepted is already durable in `alerts` (issuer_pubkey,
+   * sequence) -- read it back once at construction so an old sequence can't
+   * be accepted again just because the process restarted. Keyed by pubkey
+   * here (that's what's stored per row, not the 1-byte wire issuerIndex),
+   * then mapped back to the issuerIndex this guard actually tracks by via
+   * the *current* issuers config -- an issuer no longer configured is
+   * skipped, since it would be rejected as unknown before ever reaching the
+   * guard anyway.
+   */
+  private restoreGuardFromHistory(): number {
+    const indexByPubkey = new Map<string, number>();
+    for (const [issuerIndex, pubkey] of this.issuers) indexByPubkey.set(pubkey, issuerIndex);
+
+    const rows = this.db
+      .prepare<[], HighestSequenceRow>("SELECT issuer_pubkey, MAX(sequence) AS maxSequence FROM alerts GROUP BY issuer_pubkey")
+      .all();
+
+    let restored = 0;
+    for (const row of rows) {
+      const issuerIndex = indexByPubkey.get(row.issuer_pubkey);
+      if (issuerIndex === undefined) continue;
+      this.guard.restoreSequence(issuerIndex, row.maxSequence);
+      restored++;
+    }
+    return restored;
+  }
 
   /**
    * The hub's own verification path -- the same decision packages/core's

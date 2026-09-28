@@ -94,6 +94,6 @@ Stage 5 item 5.3 (idempotency hardening) is done: `packages/hub/test/drain.test.
 
 ## Known limitations
 
-**The replay guard is in memory.** Accepted alerts are stored in SQLite, but the `ReplayGuard` that rejects an old sequence number starts empty when the hub starts. After a restart, an older sequence from an authorised issuer could be accepted again. Persisting the per-issuer high-water mark would close it; it has not been built.
+~~**The replay guard is in memory.**~~ Fixed. `AlertService` now restores each issuer's highest previously-accepted sequence from the `alerts` table at construction (`restoreGuardFromHistory`, using `ReplayGuard.restoreSequence` from `@ligtas/core`), so a restart can no longer re-accept an old sequence. The startup log line reports how many issuers had history restored. Not persisted: the short-TTL duplicate-hash cache, `seenHashes` — for at most its 10-minute window after a restart, a mesh rebroadcast of the single most-recently-accepted alert per issuer is labelled `rejected_replay` instead of `duplicate`. Cosmetic only: both paths already stop before the alert is touched again, so nothing is re-stored and the siren line never re-fires either way.
 
 Node's native TypeScript execution can't resolve this package's own `.ts` sources directly (its `@ligtas/core` import expects compiled `.js`), so `packages/hub` has to be compiled with `tsc` before running — there's no `tsx`-style direct-run path yet. `pnpm --filter @ligtas/hub build` followed by `node dist/index.js`, not `node src/index.ts`.

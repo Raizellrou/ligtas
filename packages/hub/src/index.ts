@@ -68,7 +68,7 @@ const app = createServer(alerts, db, PWA_ORIGIN, drainConfig, demoConfig);
 
 app.listen(PORT, () => {
   console.log(
-    `hub listening on :${PORT} (db: ${DB_PATH}, ${issuers.size} issuer(s) loaded, ${households.length} household(s) loaded, ` +
+    `hub listening on :${PORT} (db: ${DB_PATH}, ${issuers.size} issuer(s) loaded (${alerts.restoredIssuerCount} with replay state restored from history), ${households.length} household(s) loaded, ` +
       `drain: ${drainConfig ? `every ${DRAIN_INTERVAL_MS}ms` : "disabled -- no LIGTAS_HUB_STELLAR_SECRET"}, ` +
       `mesh-test: ${demoConfig ? `enabled, PWA origin ${PWA_ORIGIN}` : "disabled -- no LIGTAS_ENABLE_MESH_ORCHESTRATION"})`,
   );
