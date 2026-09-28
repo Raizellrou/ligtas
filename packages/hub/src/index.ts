@@ -5,7 +5,8 @@ import { openDb } from "./db.js";
 import { loadIssuers } from "./issuers.js";
 import { loadHouseholds, seedHouseholds } from "./households.js";
 import { AlertService } from "./alertService.js";
-import { createServer, type DemoConfig, type DrainConfig } from "./server.js";
+import type { MeshTestConfig } from "./meshTestRunner.js";
+import { createServer, type DrainConfig } from "./server.js";
 import { drainOutbox } from "./drain.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -51,25 +52,24 @@ if (HUB_STELLAR_SECRET) {
   }, DRAIN_INTERVAL_MS);
 }
 
-const demoConfig: DemoConfig | undefined = ENABLE_MESH_ORCHESTRATION
-  ? {
-      meshTest: {
-        port: PORT,
-        enabled: true,
-        meshtasticatorPath: MESHTASTICATOR_PATH,
-        demoIssuerSecret: DEMO_ISSUER_SECRET,
-        demoIssuerIndex: DEMO_ISSUER_INDEX,
-      },
-      pwaOrigin: PWA_ORIGIN,
-    }
-  : undefined;
+// Built regardless of the flag: the /demo router is now always mounted, and
+// its capabilities check (read-only, no secrets in the response) needs the
+// real config either way to report accurately why orchestration is off.
+// Only `enabled` gates whether the two process-spawning routes exist at all.
+const meshTestConfig: MeshTestConfig = {
+  port: PORT,
+  enabled: ENABLE_MESH_ORCHESTRATION,
+  meshtasticatorPath: MESHTASTICATOR_PATH,
+  demoIssuerSecret: DEMO_ISSUER_SECRET,
+  demoIssuerIndex: DEMO_ISSUER_INDEX,
+};
 
-const app = createServer(alerts, db, PWA_ORIGIN, drainConfig, demoConfig);
+const app = createServer(alerts, db, PWA_ORIGIN, drainConfig, meshTestConfig);
 
 app.listen(PORT, () => {
   console.log(
     `hub listening on :${PORT} (db: ${DB_PATH}, ${issuers.size} issuer(s) loaded (${alerts.restoredIssuerCount} with replay state restored from history), ${households.length} household(s) loaded, ` +
       `drain: ${drainConfig ? `every ${DRAIN_INTERVAL_MS}ms` : "disabled -- no LIGTAS_HUB_STELLAR_SECRET"}, ` +
-      `mesh-test: ${demoConfig ? `enabled, PWA origin ${PWA_ORIGIN}` : "disabled -- no LIGTAS_ENABLE_MESH_ORCHESTRATION"})`,
+      `mesh-test: ${ENABLE_MESH_ORCHESTRATION ? `enabled, PWA origin ${PWA_ORIGIN}` : "disabled -- no LIGTAS_ENABLE_MESH_ORCHESTRATION (capabilities still answers)"})`,
   );
 });

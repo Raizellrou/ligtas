@@ -13,17 +13,12 @@ export interface DrainConfig {
   issuer: Keypair;
 }
 
-export interface DemoConfig {
-  meshTest: MeshTestConfig;
-  pwaOrigin: string;
-}
-
 export function createServer(
   alerts: AlertService,
   db: Database.Database,
   pwaOrigin: string,
   drain?: DrainConfig,
-  demo?: DemoConfig,
+  meshTest?: MeshTestConfig,
 ): Express {
   const app = express();
   app.use(express.json());
@@ -66,9 +61,11 @@ export function createServer(
     res.json(summary);
   });
 
-  if (demo) {
-    app.use("/demo", createDemoRouter(demo.meshTest, demo.pwaOrigin));
-  }
+  // Always mounted: createDemoRouter itself only registers the sensitive
+  // orchestration routes when meshTest.enabled, so a caller that omits this
+  // param (the unit tests below, and any AlertService-only usage) still gets
+  // a disabled-but-answering /demo/mesh-test/capabilities, not a hard 404.
+  app.use("/demo", createDemoRouter(meshTest ?? { port: 0, enabled: false }, pwaOrigin));
 
   return app;
 }
