@@ -3,8 +3,8 @@
 *LoRa-Integrated Grassroots Typhoon Alert System*
 
 Track: Climate Resilience and Hydrometeorological Disaster Management
-Stage 3 · Forge
-Version 0.6
+Stage 5 · Launch (MVP) — see §11 Milestones
+Version 0.7
 
 This document is the system design for the concept set out in [README.md](README.md). The README states the problem and the pitch; this document states what gets built, how the pieces fit, and what "done" means at each stage.
 
@@ -313,8 +313,8 @@ Testing is Vitest, run from the repo root across `packages/core`, `packages/hub`
 | Stage | Closes | Deliverable | Contents | Exit criterion |
 |---|---|---|---|---|
 | **3 · Forge** | 19 Sep 2026 | Version 0 | Packet codec, sign/verify, replay + dedupe rules, multi-hop propagation with node-failure rerouting, minimal hub, resident PWA, simulated sensor and siren | A signed alert reaches the hub across ≥5 hops with a relay killed mid-run; a forged packet and a replayed packet both reach the hub over the mesh but are rejected there before anything acts on them; the PWA shows the right purok its instruction |
-| **4 · Refine** | TODO | Version 1 | Offline hardening of the PWA, store-and-forward outbox, Stellar anchoring | A phone in airplane mode shows the correct purok instruction; an alert hash appears on Stellar Expert and matches the locally recomputed hash |
-| **5 · Launch** | TODO | MVP | Claimable-balance payout flow, full end-to-end demo | The full definition of done below, recorded start to finish |
+| **4 · Refine** | Done | Version 1 | Offline hardening of the PWA, store-and-forward outbox, Stellar anchoring | A phone in airplane mode shows the correct purok instruction; an alert hash appears on Stellar Expert and matches the locally recomputed hash — see `docs/proof/README.md` |
+| **5 · Launch** | 28 Sep 2026 | MVP | Claimable-balance payout flow, full end-to-end demo | The full definition of done below — see `docs/proof/mvp-e2e-2026-09-28.md` for what was verified fresh on 28 Sep, and what it reuses from earlier live runs rather than re-proving |
 
 **Definition of done (from the README, unchanged).** Trip the sensor, watch a signed warning hop five nodes with the internet off, see a phone show the right route for the right purok, reject a forged copy of that same alert, then restore connectivity and watch the record and payout land on Stellar.
 
@@ -359,6 +359,7 @@ Opened by the v0.5 resident-app work:
 ### Resolved since v0.1
 
 - **What the resident app does beyond one instruction (v0.5).** Previously §8 described a single purok instruction. It now specifies the tiered flow, an on-device route to the nearest center with a demo flood model, on-device location, optional household check-in, ages on everything shown, and live polling — with the limits of each stated (§8, questions 9–11 at the time, now 9–10; #11 is resolved below).
+- **MVP definition of done (v0.7).** Stage 5's last open item, the end-to-end demo recording, is closed: `docs/proof/mvp-e2e-2026-09-28.md` runs the hub, PWA and Stellar layers together fresh, with every hash independently re-checked against Horizon. It reuses, rather than re-proves, the mesh leg's existing live proof (`packages/mesh-sim/README.md`), since it was run on a machine with no Docker or Meshtasticator available — stated plainly in that doc, not glossed over.
 - **Replay guard across a hub restart (v0.6).** Was open question #11: the hub's replay state was in memory, so after a restart an older sequence from an authorised issuer could be accepted again. Every accepted alert was already durable in the hub's own `alerts` table (issuer, sequence), so `AlertService` now reads that history back at construction and restores each issuer's high-water mark before serving another request. See `packages/hub/README.md`, "Known limitations" (the note there records the one narrow, cosmetic trade-off left: the short-lived duplicate-hash cache is not restored).
 
 - **Mesh carriage and the mesh-sim boundary.** Previously undefined: what actually crosses the TCP boundary to Meshtasticator. Now specified in §5.5 — the raw 84 bytes as Meshtastic data payload, driven by a Python process kept deliberately outside the TypeScript codebase for licence reasons.

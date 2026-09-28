@@ -120,15 +120,17 @@ cd ligtas && git checkout development-branch
 
 ### Read this before you do anything else
 
-**`main` is 14 commits behind and is NOT where the work is.** `main` is the
-submission/stable branch — it stops at "Add LIGTAS PRD". Every package built so far lives
-on `development-branch`.
+**Still branch from `development-branch`, not `main`.** `main` is the submission branch. It
+sat at "Add LIGTAS PRD" for most of this project and was brought fully current on 28 Sep (PR
+#5) — but it only moves when a PR merges it, so it will lag `development-branch` again the
+moment new work lands there. Don't trust a specific "N commits behind" figure written into this
+doc; check `git log --oneline -1 origin/main` if you need the real number.
 
-| Branch | Commit | What it is | Use it? |
-|---|---|---|---|
-| `development-branch` | `12c4a4f` | **The real trunk.** All Stage 3 work. | Yes — branch from here, PR back into here. |
-| `main` | `2e05adf` | Submission branch, 14 commits behind. | No. Never commit here, never branch from here. |
-| `stage3/core-packet-codec` | `4e6af48` | Dead feature branch, already merged forward and superseded. | No. Ignore it. |
+| Branch | What it is | Use it? |
+|---|---|---|
+| `development-branch` | **The real trunk.** All work happens here. | Yes — branch from here, PR back into here. |
+| `main` | Submission branch, updated by PR only. | No. Never commit here, never branch from here. |
+| `stage3/core-packet-codec` | Dead feature branch, already merged forward and superseded. | No. Ignore it. |
 
 Point your local branch at the right remote so you cannot drift:
 
@@ -495,7 +497,7 @@ recomputed hash. See `docs/proof/` and item 4.3's PR for how each was verified.
 | 5.1 | **Payout flow** | Done | One `createClaimableBalance` per matched household. Flat by severity tier — **tier 1 = 10 XLM, tier 2 = 25 XLM, tier 3 = 50 XLM**, native XLM on Testnet (decided in BUILD-PLAN §6). `payout_status`/`payout_tx` drive the same two-phase durability pattern anchoring already used. Verified live end to end — see `packages/hub/README.md`. |
 | 5.2 | **Registry wiring** | Done | `households` table (household ID → purok → Stellar address) lives in the hub's SQLite DB, seeded from `config/households.json` on startup. `docs/master.md`'s TODO on where it lives is resolved; syncing it across multiple hubs is still genuinely open (PRD §12 #5). |
 | 5.3 | **Idempotency hardening** | Done | Dedicated Vitest coverage: crash-before-confirmation reconciled as confirmed without resubmitting, crash-before-network-receipt resubmitted exactly once, an already-created payout never re-queried, and concurrent overlapping `drainOutbox` calls collapsed onto one in-flight run (a real double-payment race, caught live and fixed — `c6d6127`). The Horizon-query fallback for when `payout_status` itself is ambiguous is now built too: `reconcilePayoutByExistingBalances` in `packages/hub/src/drain.ts` checks existing claimable balances for the affected households before ever resubmitting. `packages/hub/test/drain.test.ts`. |
-| 5.4 | Demo recording | In progress | The README's full definition of done, start to finish, uncut. A live mesh-to-hub-to-PWA rehearsal run is what surfaced and fixed the 5.1–5.3 bugs above (`556ca0c`…`c6d6127`), so this is actively underway rather than not started — but the recording itself isn't finished, and `apps/pwa/public/alert-bundle.json` has an uncommitted fresh capture pending a decision on whether to keep it. **Last item blocking v0.** |
+| 5.4 | Demo recording | Done | The README's full definition of done, verified: the mesh leg was already proven live in an earlier session (`packages/mesh-sim/README.md`'s 9/9 checks; `apps/pwa/public/alert-bundle.json` is that run's genuine captured output, not a mock). `docs/proof/mvp-e2e-2026-09-28.md` runs everything downstream fresh in one sitting — genuine/duplicate/forged/replayed packets against a real hub, the right purok on a real phone, and a real anchor + payout on Testnet, every hash independently re-checked against Horizon, not trusted from the hub's own response. Not a single unbroken recording through physical/Docker-simulated radio hops (no Docker or Meshtasticator on the machine that ran this) — see that doc's "What this does not prove." |
 
 Prerequisite: **the hub's own paying account** must be Friendbot-funded before this stage —
 each claimable balance it creates raises *its own* reserve requirement. Household/claimant
