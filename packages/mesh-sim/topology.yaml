@@ -1,0 +1,59 @@
+# Sensor, two rooftop relays, hub -- README's "one at the river... two or
+# three on rooftops as relays, one at the barangay hall." Both relays are in
+# range of the sensor and of the hub, but out of range of each other.
+#
+# This redundancy converges at the HUB, not at a shared downstream relay --
+# deliberately. A first attempt had both relays feed into a third relay
+# node, and that third node never forwarded anything: its own scheduled
+# rebroadcast kept getting cancelled on hearing what looked like a duplicate
+# arriving from the other relay at nearly the same moment -- confirmed via
+# numTxRelayCanceled, real Meshtastic flood-routing collision avoidance, not
+# a bug. A relay has to decide whether to forward and can lose that race;
+# the hub is the final destination and never forwards anything, so there is
+# no decision to lose. Converging redundant paths on an endpoint rather than
+# on another relay avoids the failure mode structurally instead of tuning
+# around it.
+#
+# Coordinates are chosen against the simulator's default antenna range
+# (~2013 m at antennaGain=0, see lib/phy.py estimate_max_range) so every
+# link below is real and every non-link is a real gap, not a guess.
+0: # sensor (river) -- originates only, doesn't need to relay
+  x: 0
+  y: 0
+  z: 1.0
+  isRouter: false
+  isRepeater: false
+  isClientMute: false
+  hopLimit: 5
+  antennaGain: 0
+  neighborInfo: false
+1: # relay A (rooftop)
+  x: 1200
+  y: 1200
+  z: 1.0
+  isRouter: false
+  isRepeater: true
+  isClientMute: false
+  hopLimit: 5
+  antennaGain: 0
+  neighborInfo: false
+2: # relay B (rooftop) -- redundant path, out of range of relay A
+  x: -1400
+  y: 1400
+  z: 1.0
+  isRouter: false
+  isRepeater: true
+  isClientMute: false
+  hopLimit: 5
+  antennaGain: 0
+  neighborInfo: false
+3: # hub (barangay hall) -- terminates only, doesn't need to relay
+  x: 0
+  y: 2800
+  z: 1.0
+  isRouter: false
+  isRepeater: false
+  isClientMute: false
+  hopLimit: 5
+  antennaGain: 0
+  neighborInfo: false

@@ -1,0 +1,99 @@
+# @ligtas/hub
+
+The verifying endpoint per PRD Section 5.4/5.5/9. Receives raw alert packet hex from `packages/mesh-sim`, verifies it with the same `@ligtas/core` logic the PWA and `verify-alert.ts` use, stores accepted alerts in SQLite, and serves them back as an `AlertBundle` (see `docs/alert-bundle.schema.json`).
+
+## Setup
+
+```bash
+cd packages/hub
+cp config/issuers.example.json config/issuers.json
+# edit issuers.json with real issuer public keys, or generate a demo one:
+#   node ../core/dist/scripts/emit-alert.js --sequence 1
+# and put its expectedIssuerPublicKey (not the secret) in issuers.json
+```
+
+`config/issuers.json` holds only public keys — safe to commit, needed for a reproducible demo. Never put a secret key in it.
+
+`config/households.json` is the same idea for the payout registry (PRD Section 4, layer L5): household ID, purok, and Stellar address — no secrets, since households only ever receive funds here, never sign anything.
+
+## Running
+
+```bash
+pnpm --filter @ligtas/core build   # if not already built
+pnpm --filter @ligtas/hub build    # tsc has no direct .ts execution path here -- see Known limitation below
+PORT=3001 node packages/hub/dist/index.js
+```
+
+Env vars: `PORT` (default 3001), `LIGTAS_DB_PATH` (default `packages/hub/hub.sqlite`), `LIGTAS_ISSUERS_PATH` (default `packages/hub/config/issuers.json`), `LIGTAS_HOUSEHOLDS_PATH` (default `packages/hub/config/households.json`), `LIGTAS_PWA_ORIGIN` (default `http://localhost:5173`) — the one web origin allowed to read the hub's responses, see "CORS" below.
+
+**Drain worker** (PRD Section 6.2, `@ligtas/stellar`) is optional and off unless configured:
+
+- `LIGTAS_HUB_STELLAR_SECRET` — the hub's *own* Stellar Testnet account secret (distinct from the field issuer keys in `issuers.json`, which only ever verify signatures, never hold funds here). Without this set, the hub runs exactly as before; `POST /drain` returns 503.
+- `LIGTAS_DRAIN_INTERVAL_MS` (default 60000) — how often the worker automatically drains the outbox when the secret is set.
+
+## API
+
+- `POST /alert` — body `{ "packetHex": "<168 hex chars>" }`. Returns `{ decision, alertHash? }`. `decision` is one of `accepted`, `rejected_signature`, `rejected_unknown_issuer`, `rejected_replay`, `duplicate`, `malformed`.
+- `GET /alerts` — a live `AlertBundle` (`source: "live"`), same shape `apps/pwa` consumes from a captured file. Only accepted alerts are in it: a rejected packet is never stored. `apps/pwa` polls this every 15 s while the app is open, and verifies every packet itself rather than trusting the hub's filtering.
+- `POST /drain` — manually triggers an outbox drain: anchors every `pending` alert to Stellar Testnet (reconciling anything stuck `submitted` from an interrupted run first), then, for each now-`confirmed` alert with `payout_status = 'none'`, creates one claimable balance per matched household (PRD Section 7) — flat by severity tier (`@ligtas/stellar`'s `PAYOUT_TIER_AMOUNT_XLM`), reconciling anything stuck `pending` from an interrupted run first, the same way anchoring does. Returns `{ anchors: [{ alertHash, outcome }], payouts: [{ alertHash, outcome, matchedHouseholds? }] }`. 503 if `LIGTAS_HUB_STELLAR_SECRET` isn't set.
+- `GET /health` — liveness check.
+
+**Household check-in** (`src/householdRoutes.ts`, `src/checkins.ts`) — the PWA's "I'm safe" / "I need help":
+
+- `GET /household/resolve/:joinCode` — `{ householdId }`, or 404 `{ error: "unknown join code" }`.
+- `GET /household/:householdId/status` — `{ householdId, members: [{ displayName, status, updatedAt }], stellarAddress }`, or 404. `updatedAt` is **milliseconds** (the alert times elsewhere are seconds) and is when the hub recorded the check-in, not when the person tapped it.
+- `POST /household/:householdId/checkin` — body `{ displayName, status, clientCheckinId }`: `displayName` a non-empty string of at most 40 characters, `status` `"safe"` or `"need_help"`, `clientCheckinId` a non-empty client-generated id. Returns `{ householdId, members }`; 400 with a message on a bad field, 404 on an unknown household. A member has one row, so a new status replaces the old one, and re-sending the same `clientCheckinId` (a retry from the phone's offline queue) is ignored rather than applied twice.
+
+**Dev-only, off by default** — the Tester tab's "Live mesh demo" panel (`apps/pwa`), see
+`docs/ONBOARDING.md` Section 4.3:
+
+- `GET /demo/mesh-test/capabilities` — `{ available, reasons[] }`.
+- `POST /demo/mesh-test/run` — body `{ "script": "bridge" | "relay-proof" }`. Spawns the
+  matching `packages/mesh-sim` script as a child process. 409 if one is already running (only
+  one at a time, module-level, gone on restart — same ephemerality as the drain worker's own
+  `inFlight` guard, not persisted anywhere).
+- `GET /demo/mesh-test/:jobId/status?after=<n>` — `{ status, newLines[], nextIndex, summary?, error? }`,
+  polled by the panel. `summary` is a parsed PASS/FAIL checklist for `relay-proof`, or the
+  captured `AlertBundle` for `bridge`.
+
+These three routes don't exist at all unless `LIGTAS_ENABLE_MESH_ORCHESTRATION` is set —
+not merely gated per-request. This is deliberately a *stricter* bar than the rest of this
+API: `/alert`, `/alerts`, `/drain`, and `/health` all have zero auth today, matching the
+project's threat model that the hub only ever sits on a barangay's own local network. This
+route spawns local processes, which is categorically more sensitive, so it gets its own
+explicit opt-in rather than quietly inheriting that same "no auth" default — never enable it
+on a hub any judge or the public can reach.
+
+**CORS.** The PWA is a different origin from the hub, so a browser blocks it from reading any
+response that does not say otherwise. Three route groups say so, each for `LIGTAS_PWA_ORIGIN`
+only (the origin is echoed back on an exact match, never `*`): `GET /alerts`, `/household/*`, and
+`/demo/*` (each scoped to itself). `POST /alert`, `POST /drain` and `/health` send no CORS header, so
+a browser page cannot read them. A page served from any other origin, for example the
+production preview on `localhost:4173`, gets "can't reach the hub" from the PWA even though the
+hub is up.
+
+## Verified live, not just unit tested
+
+`packages/mesh-sim/bridge_to_hub.py` drives the full chain for real: Docker-simulated LoRa mesh → a packet arriving at the hub node's own client interface → HTTP POST to this server → real signature verification → SQLite → `GET /alerts`. Run it (with the hub already running) to see a genuine alert accepted and a forged one — which the mesh forwards exactly like a real packet, per PRD Section 5.5 — rejected here instead.
+
+The drain worker was run for real against Stellar Testnet during development, not mocked: posted a genuine alert, confirmed it sat at `anchor_status = 'pending'`, called `POST /drain`, and:
+
+1. It came back `confirmed`, with a real `anchor_tx` — fetched independently from Horizon and decoded the memo myself: matched the hub's own `alertHash` exactly.
+2. Re-running `POST /drain` with nothing new pending returned `{ anchors: [], payouts: [] }` — no double-anchor.
+3. Manually reset that same row back to `anchor_status = 'submitted'` (simulating a crash between recording the tx hash and confirming it) and ran `POST /drain` again — it reconciled against Horizon and marked it `confirmed` **without** creating a second transaction (`anchor_tx` unchanged).
+
+Payout (PRD Section 7 / Stage 5 item 5.1) was verified the same way, in the same session — full loop, real Testnet:
+
+1. Seeded `config/households.json`'s three demo households (real generated Testnet public keys, two in purok 3, one in purok 4 — none pre-funded).
+2. Posted a genuine tier-2 alert targeting puroks 3 and 4. `POST /drain` anchored it, then in that **same** call created one `createClaimableBalance` per matched household (3 total, 25 XLM each — tier 2's amount) — none of the destination accounts needed to exist beforehand; only the hub's own paying account needs the reserve.
+3. Fetched the operations back from Horizon directly and confirmed each claimant's predicate: unconditional for the household, `NOT(before 2,592,000s)` for the hub account — exactly 30 days (PRD open question #7, resolved), not asserted.
+4. Re-running `POST /drain` with nothing new returned empty arrays again — no double-pay.
+5. Manually reset that alert's `payout_status` back to `'pending'` (simulating a crash right after submission) and ran `POST /drain` again — reconciled to `'created'` against Horizon **without** creating a second transaction (`payout_tx` unchanged, `attempts` stayed `0`).
+
+Stage 5 item 5.3 (idempotency hardening) is done: `packages/hub/test/drain.test.ts` has dedicated automated coverage for the crash-before-confirmation, crash-before-network-receipt, already-created, and concurrent-overlapping-`drainOutbox` cases (the last one a real double-payment race, caught live during a demo run and fixed — see `packages/hub/src/drain.ts`'s module docstring). The extra defense-in-depth check PRD Section 7 describes for the *ambiguous* case — querying Horizon for existing claimable balances when `payout_status` itself can't be trusted via the transaction hash — is also built (`reconcilePayoutByExistingBalances` in `drain.ts`, backed by `findMatchingClaimableBalance` in `packages/stellar`). **Unlike everything else in this section, that fallback path has been unit-tested against mocked Horizon responses, not yet exercised live** — it only runs when Horizon itself returns something other than a clean "not found" for a transaction-hash lookup, a case that hasn't come up in a real Testnet run yet.
+
+## Known limitations
+
+~~**The replay guard is in memory.**~~ Fixed. `AlertService` now restores each issuer's highest previously-accepted sequence from the `alerts` table at construction (`restoreGuardFromHistory`, using `ReplayGuard.restoreSequence` from `@ligtas/core`), so a restart can no longer re-accept an old sequence. The startup log line reports how many issuers had history restored. Not persisted: the short-TTL duplicate-hash cache, `seenHashes` — for at most its 10-minute window after a restart, a mesh rebroadcast of the single most-recently-accepted alert per issuer is labelled `rejected_replay` instead of `duplicate`. Cosmetic only: both paths already stop before the alert is touched again, so nothing is re-stored and the siren line never re-fires either way.
+
+Node's native TypeScript execution can't resolve this package's own `.ts` sources directly (its `@ligtas/core` import expects compiled `.js`), so `packages/hub` has to be compiled with `tsc` before running — there's no `tsx`-style direct-run path yet. `pnpm --filter @ligtas/hub build` followed by `node dist/index.js`, not `node src/index.ts`.

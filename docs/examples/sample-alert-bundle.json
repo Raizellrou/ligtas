@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": 1788300400,
+  "source": "captured",
+  "captureNote": "Hand-assembled example for Stage 3 day one -- real signed packets from packages/core emit-alert.ts, not from a live mesh-sim run yet. Replace with an actual captured bundle once mesh-sim POSTs to a real hub.",
+  "issuers": [
+    {
+      "issuerIndex": 0,
+      "issuerPublicKey": "GAIEAL2KX2RPP3ZE46EVSP23QHOO7PP3KYT2KEMOVZGM3SQ2ASNWDTD4",
+      "label": "Barangay captain (example)"
+    }
+  ],
+  "alerts": [
+    {
+      "packetHex": "010102000000000c6a9800940000000100bb000029242fddc6d03d11f174243219db59153ed56f068511220bc1c851fcff8ce721412d32347d32bf0bb8451ba3b55780b23b8caa988002f46d944c095569191402",
+      "receivedAt": 1788300000,
+      "demoLabel": "genuine -- tier 2, puroks 3 and 4"
+    },
+    {
+      "packetHex": "010102000000000c6a9800950000000200d20000b1ed05d86f7cbd9a95798d66f203a0f5dd1bcdb325cdb81f76a196f226ca4bed17dc720eae007db0b30125e9f1fe0ed47c7cd301019410650f9a4094990a4b02",
+      "receivedAt": 1788300120,
+      "demoLabel": "genuine -- tier 2, water risen further"
+    },
+    {
+      "packetHex": "010102000000000c6a9800960000000300bb000079755fd8d11230fe3309c3513ebcfe7bc48310a1dfa56e92d646bc5d19e595afd32ca9aef78806e48a088a547e352f2d85afe0b8ccbfe801a82008bef6a63d01",
+      "receivedAt": 1788300200,
+      "demoLabel": "forged -- signed by an impostor key, not the issuer above"
+    },
+    {
+      "packetHex": "010102000000000c6a9800970000000100c300002c9c1687acf88d87f1032623be91eeecf1c617e712b9c2453bdae225a0fa4ce2e7bc5ad0557e21649295dbc7a607d9ccc0eb13b84d96c64abd44107411d06402",
+      "receivedAt": 1788300300,
+      "demoLabel": "replay -- sequence 1 again (already superseded by sequence 2), different body/hash from alert 0"
+    }
+  ]
+}

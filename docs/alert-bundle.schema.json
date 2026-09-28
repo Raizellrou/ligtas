@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Raizellrou/ligtas/docs/alert-bundle.schema.json",
+  "title": "LIGTAS Alert Bundle",
+  "description": "Wire contract between packages/hub, apps/pwa, and any captured demo dataset. See packages/core/src/bundle.ts for the canonical TypeScript types and rationale.",
+  "type": "object",
+  "required": ["schemaVersion", "generatedAt", "source", "issuers", "alerts"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "generatedAt": {
+      "type": "integer",
+      "description": "Unix seconds. When this bundle was produced."
+    },
+    "source": {
+      "enum": ["live", "captured"],
+      "description": "'live' = served fresh by the hub's GET /alerts. 'captured' = a static file from a recorded mesh-sim run, used by the hosted PWA build where no hub is reachable."
+    },
+    "captureNote": {
+      "type": "string",
+      "description": "Required in practice when source is 'captured' -- provenance, e.g. which mesh-sim run and when."
+    },
+    "issuers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["issuerIndex", "issuerPublicKey"],
+        "additionalProperties": false,
+        "properties": {
+          "issuerIndex": { "type": "integer", "minimum": 0, "maximum": 255 },
+          "issuerPublicKey": {
+            "type": "string",
+            "pattern": "^G[A-Z2-7]{55}$",
+            "description": "Stellar public key, StrKey encoded."
+          },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "alerts": {
+      "type": "array",
+      "description": "Ascending by receivedAt -- order matters for replaying through a ReplayGuard.",
+      "items": {
+        "type": "object",
+        "required": ["packetHex", "receivedAt"],
+        "additionalProperties": false,
+        "properties": {
+          "packetHex": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{168}$",
+            "description": "84-byte packet (20-byte body + 64-byte Ed25519 signature) as lowercase hex -- 168 hex characters."
+          },
+          "receivedAt": {
+            "type": "integer",
+            "description": "Hub's local receive time, unix seconds. Not the packet's own issuedAt field, which is never trusted for ordering (PRD Section 5.4)."
+          },
+          "demoLabel": {
+            "type": "string",
+            "description": "Narration only, e.g. 'forged (impostor key)'. Never consulted by verification logic."
+          }
+        }
+      }
+    }
+  }
+}

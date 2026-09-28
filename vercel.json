@@ -1,0 +1,4 @@
+{
+  "buildCommand": "pnpm --filter @ligtas/core build && pnpm --filter @ligtas/pwa build",
+  "outputDirectory": "apps/pwa/dist"
+}
